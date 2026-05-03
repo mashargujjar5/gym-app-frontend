@@ -1,49 +1,46 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Image, ActivityIndicator, RefreshControl } from 'react-native';
 import { Colors } from '../theme';
 import { Search } from 'lucide-react-native';
-
-const mockMessages = [
-  {
-    id: '1',
-    name: 'Sarah Johnson',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop',
-    online: true,
-    time: '9:41 AM',
-    message: 'Great check-in this week! Keep up the amazing work with your squats 💪',
-    unread: 2,
-  },
-  {
-    id: '2',
-    name: 'Mike Chen',
-    avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100&h=100&fit=crop',
-    online: true,
-    time: 'Yesterday',
-    message: 'I\'ve updated your meal plan for next week. Take a look when you can.',
-    unread: 0,
-  },
-  {
-    id: '3',
-    name: 'Emily Rodriguez',
-    avatar: 'https://images.unsplash.com/photo-1554151228-14d9def656e4?w=100&h=100&fit=crop',
-    online: false,
-    time: 'Tuesday',
-    message: 'Can you send me a video of your deadlift form? Want to make sure technique is perfect.',
-    unread: 0,
-  },
-  {
-    id: '4',
-    name: 'David Kim',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop',
-    online: false,
-    time: 'Monday',
-    message: 'Remember to stay hydrated during your workouts today! 💧',
-    unread: 0,
-  },
-];
+import { messageService } from '../services/messageService';
 
 export const AthleteMessagesScreen = ({ navigation }: any) => {
   const [activeTab, setActiveTab] = useState<'coach' | 'friends'>('coach');
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const fetchConversations = async () => {
+    try {
+      const response = await messageService.getConversations();
+      if (response.success) {
+        setConversations(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch conversations:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchConversations();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchConversations();
+  };
+
+  const filteredConversations = conversations.filter(conv => {
+    // For athlete, "coach" tab shows users with role 'coach'
+    // "friends" tab could show others if the backend supported it, but currently it's mostly coach
+    const matchesTab = activeTab === 'coach' ? conv.user.role === 'coach' : conv.user.role !== 'coach';
+    const matchesSearch = conv.user.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesTab && matchesSearch;
+  });
 
   return (
     <View style={styles.container}>
@@ -65,7 +62,7 @@ export const AthleteMessagesScreen = ({ navigation }: any) => {
             <Text style={[styles.tabText, activeTab === 'friends' && styles.tabTextActive]}>Friends</Text>
           </TouchableOpacity>
         </View>
-
+ 
         {/* Search */}
         <View style={styles.searchContainer}>
           <Search size={18} color={Colors.textMuted} />
@@ -73,39 +70,77 @@ export const AthleteMessagesScreen = ({ navigation }: any) => {
             style={styles.searchInput}
             placeholder="Search conversations..."
             placeholderTextColor={Colors.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
           />
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {mockMessages.map((msg, index) => (
-          <TouchableOpacity 
-            key={msg.id} 
-            style={[styles.messageRow, index !== mockMessages.length - 1 && styles.messageRowBorder]}
-            onPress={() => navigation.navigate('AthleteChatDetail')}
-          >
-            <View style={styles.avatarContainer}>
-              <Image source={{ uri: msg.avatar }} style={styles.avatar} />
-              {msg.online && <View style={styles.onlineDot} />}
+      {loading && !refreshing ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      ) : (
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent} 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
+          }
+        >
+          {filteredConversations.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No messages yet</Text>
             </View>
-            
-            <View style={styles.messageContent}>
-              <View style={styles.messageHeader}>
-                <Text style={styles.name}>{msg.name}</Text>
-                <Text style={styles.time}>{msg.time}</Text>
-              </View>
-              <View style={styles.messageFooter}>
-                <Text style={styles.messageText} numberOfLines={2}>{msg.message}</Text>
-                {msg.unread > 0 && (
-                  <View style={styles.unreadBadge}>
-                    <Text style={styles.unreadText}>{msg.unread}</Text>
+          ) : (
+            filteredConversations.map((conv, index) => (
+              <TouchableOpacity 
+                key={conv.user._id} 
+                style={[styles.messageRow, index !== filteredConversations.length - 1 && styles.messageRowBorder]}
+                onPress={() => navigation.navigate('AthleteChatDetail', { 
+                  userId: conv.user._id,
+                  name: conv.user.name,
+                  avatar: conv.user.profilePhoto
+                })}
+              >
+                <View style={styles.avatarContainer}>
+                  {conv.user.profilePhoto ? (
+                    <Image source={{ uri: conv.user.profilePhoto }} style={styles.avatar} />
+                  ) : (
+                    <View style={styles.avatarPlaceholder}>
+                      <Text style={styles.avatarText}>{conv.user.name.charAt(0)}</Text>
+                    </View>
+                  )}
+                  {conv.user.lastActiveAt && (new Date().getTime() - new Date(conv.user.lastActiveAt).getTime() < 5 * 60 * 1000) && (
+                    <View style={styles.onlineDot} />
+                  )}
+                </View>
+                
+                <View style={styles.messageContent}>
+                  <View style={styles.messageHeader}>
+                    <Text style={styles.name}>{conv.user.name}</Text>
+                    {conv.lastMessage && (
+                      <Text style={styles.time}>
+                        {new Date(conv.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                    )}
                   </View>
-                )}
-              </View>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+                  <View style={styles.messageFooter}>
+                    <Text style={styles.messageText} numberOfLines={2}>
+                      {conv.lastMessage ? conv.lastMessage.content : "No messages yet"}
+                    </Text>
+                    {conv.unreadCount > 0 && (
+                      <View style={styles.unreadBadge}>
+                        <Text style={styles.unreadText}>{conv.unreadCount}</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+      )}
     </View>
   );
 };
@@ -178,6 +213,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 100,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    paddingTop: 100,
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: Colors.textMuted,
+    fontSize: 16,
+  },
   messageRow: {
     flexDirection: 'row',
     paddingVertical: 20,
@@ -194,6 +242,19 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
+  },
+  avatarPlaceholder: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#010E1F',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: Colors.white,
+    fontSize: 20,
+    fontWeight: '800',
   },
   onlineDot: {
     position: 'absolute',
@@ -252,3 +313,4 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 });
+

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Keyboa
 import { Colors } from '../theme';
 import { User, Briefcase, FileText, ChevronDown, Plus, Camera } from 'lucide-react-native';
 
-export const CoachProfileSetupScreen = ({ navigation }: any) => {
+export const CoachProfileSetupScreen = ({ navigation, route }: any) => {
   const [name, setName] = useState('');
   const [experience, setExperience] = useState('');
   const [bio, setBio] = useState('');
@@ -106,7 +106,7 @@ export const CoachProfileSetupScreen = ({ navigation }: any) => {
           <TouchableOpacity 
             style={[styles.continueBtn, !isFormValid && styles.continueBtnDisabled]}
             disabled={!isFormValid}
-            onPress={() => navigation.navigate('CoachCode')}
+            onPress={() => navigation.navigate('CoachCode', { referralCode: route.params?.referralCode })}
           >
             <Text style={[styles.continueBtnText, !isFormValid && styles.continueBtnTextDisabled]}>
               Complete Setup & Continue

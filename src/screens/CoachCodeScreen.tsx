@@ -3,7 +3,13 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } fr
 import { Colors } from '../theme';
 import { Sparkles, Copy, Share2, Users, MessageCircle } from 'lucide-react-native';
 
-export const CoachCodeScreen = ({ navigation }: any) => {
+export const CoachCodeScreen = ({ navigation, route }: any) => {
+  const referralCode = route.params?.referralCode || 'CM-921';
+  
+  // Split code for display if it matches CM-XXXX format (e.g., CM-9 and 210)
+  const displayCodeTop = referralCode.includes('-') ? referralCode.split('-')[0] + '-' + referralCode.split('-')[1].substring(0, 1) : referralCode;
+  const displayCodeBottom = referralCode.includes('-') ? referralCode.split('-')[1].substring(1) : '';
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
@@ -34,8 +40,8 @@ export const CoachCodeScreen = ({ navigation }: any) => {
 
           {/* Code Card */}
           <View style={styles.codeCard}>
-            <Text style={styles.codeText}>CM-9</Text>
-            <Text style={styles.codeText}>921</Text>
+            <Text style={styles.codeText}>{displayCodeTop}</Text>
+            <Text style={styles.codeText}>{displayCodeBottom}</Text>
             <View style={styles.codeDivider} />
             
             <TouchableOpacity style={styles.copyBtn}>

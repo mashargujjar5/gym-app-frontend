@@ -12,6 +12,8 @@ import {
 import { Colors, Typography, BorderRadius } from '../theme';
 import { Button, Input } from '../components';
 import { LogIn, Mail, Lock, Apple } from 'lucide-react-native';
+import { authService } from '../services/authService';
+import { Alert } from 'react-native';
 
 export const LoginScreen = ({ navigation, route }: any) => {
   const role = route?.params?.role || 'athlete';
@@ -22,16 +24,37 @@ export const LoginScreen = ({ navigation, route }: any) => {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+
     Keyboard.dismiss();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      if (isCoach) {
-        navigation.replace('CoachTabs');
-      } else {
-        navigation.replace('AthleteTabs');
+    try {
+      const response = await authService.login({ email, password });
+      if (response.success) {
+        // Redirection logic based on role and profile completion
+        if (response.user.role === 'coach') {
+          navigation.replace('CoachTabs');
+        } else {
+          if (response.user.isProfileComplete) {
+            navigation.replace('AthleteTabs');
+          } else {
+            navigation.replace('AthleteQuestionnaire');
+          }
+        }
       }
-    }, 1500);
+    } catch (error: any) {
+      if (error.isVerified === false) {
+        Alert.alert('Verification Required', 'Please verify your email first.');
+        navigation.navigate('OTP', { email, type: 'email-verification', role: 'athlete' }); // Default role for redirection
+      } else {
+        Alert.alert('Login Failed', error.message || 'Invalid credentials');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -77,7 +100,10 @@ export const LoginScreen = ({ navigation, route }: any) => {
               />
             </View>
 
-            <TouchableOpacity style={styles.forgotBtn}>
+            <TouchableOpacity 
+              style={styles.forgotBtn}
+              onPress={() => navigation.navigate('ForgotPassword')}
+            >
               <Text style={styles.forgotText}>Forgot Password?</Text>
             </TouchableOpacity>
 

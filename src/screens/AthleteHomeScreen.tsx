@@ -27,7 +27,8 @@ import {
   Home,
   Utensils,
   LineChart,
-  Settings
+  Settings,
+  MessageCircle
 } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');
@@ -72,8 +73,11 @@ export const AthleteHomeScreen = ({ navigation }: any) => {
             <Text style={styles.userName}>Alex</Text>
           </View>
           <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.notifBtn}>
-              <Bell size={22} color={Colors.textPrimary} />
+            <TouchableOpacity 
+              style={styles.notifBtn}
+              onPress={() => navigation.navigate('AthleteMessages')}
+            >
+              <MessageCircle size={22} color={Colors.textPrimary} />
               <View style={styles.badgeContainer}>
                 <Text style={styles.badgeText}>3</Text>
               </View>
@@ -235,30 +239,6 @@ export const AthleteHomeScreen = ({ navigation }: any) => {
         </View>
 
       </ScrollView>
-
-      {/* Mock Bottom Tab Navigation for presentation purposes */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}>
-          <Home size={24} color={Colors.primary} />
-          <Text style={[styles.navText, { color: Colors.primary }]}>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Dumbbell size={24} color={Colors.textMuted} />
-          <Text style={styles.navText}>Workout</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Utensils size={24} color={Colors.textMuted} />
-          <Text style={styles.navText}>Nutrition</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <LineChart size={24} color={Colors.textMuted} />
-          <Text style={styles.navText}>History</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Settings size={24} color={Colors.textMuted} />
-          <Text style={styles.navText}>Settings</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 };

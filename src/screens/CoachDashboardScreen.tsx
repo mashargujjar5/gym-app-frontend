@@ -46,11 +46,14 @@ export const CoachDashboardScreen = ({ navigation }: any) => {
                 <Text style={styles.summaryVal}>7</Text>
                 <Text style={styles.summaryLabel}>Workouts Today</Text>
               </View>
-              <View style={styles.summaryItem}>
+              <TouchableOpacity 
+                style={styles.summaryItem}
+                onPress={() => navigation.navigate('CoachMessages')}
+              >
                 <View style={styles.summaryIconWrap}><MessageCircle size={20} color="#06B6D4" /></View>
                 <Text style={styles.summaryVal}>3</Text>
                 <Text style={styles.summaryLabel}>Unread</Text>
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
 

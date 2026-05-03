@@ -1,71 +1,65 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Image, SafeAreaView, Modal, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Image, SafeAreaView, Modal, Platform, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { Colors } from '../theme';
-import { Search, Sparkles, X } from 'lucide-react-native';
-
-const mockMessages = [
-  {
-    id: '1',
-    name: 'Jessica Lee',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop',
-    time: '2:30 PM',
-    message: 'Thanks for the new workout plan! I\'m excited to start tomorrow.',
-    unread: 2,
-  },
-  {
-    id: '2',
-    name: 'Michael Torres',
-    avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100&h=100&fit=crop',
-    time: '1:15 PM',
-    message: 'Yes, I can do the session at 6 PM today',
-    unread: 1,
-  },
-  {
-    id: '3',
-    name: 'Sophia Chen',
-    avatar: 'https://images.unsplash.com/photo-1554151228-14d9def656e4?w=100&h=100&fit=crop',
-    time: '11:45 AM',
-    message: 'Perfect! I\'ll send you the progress photos tonight.',
-    unread: 0,
-  },
-  {
-    id: '4',
-    name: 'Robert Kim',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop',
-    time: 'Yesterday',
-    message: 'I\'ve been feeling much better with the new nutrition plan',
-    unread: 0,
-  },
-  {
-    id: '5',
-    name: 'Emma Watson',
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop',
-    time: 'Yesterday',
-    message: 'Can we reschedule tomorrow\'s session to 8 AM?',
-    unread: 4,
-  },
-  {
-    id: '6',
-    name: 'David Martinez',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop',
-    time: 'Monday',
-    message: 'Great session today! My squats are getting stronger 💪',
-    unread: 0,
-  },
-  {
-    id: '7',
-    name: 'Olivia Brown',
-    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=100&h=100&fit=crop',
-    time: 'Monday',
-    message: 'Thank you for adjusting my meal plan!',
-    unread: 0,
-  },
-];
+import { Search, Sparkles } from 'lucide-react-native';
+import { messageService } from '../services/messageService';
 
 export const CoachMessagesScreen = ({ navigation }: any) => {
   const [search, setSearch] = useState('');
   const [isBroadcastVisible, setBroadcastVisible] = useState(false);
   const [broadcastMessage, setBroadcastMessage] = useState('');
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchConversations = async () => {
+    try {
+      const response = await messageService.getConversations();
+      if (response.success) {
+        setConversations(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch conversations:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchConversations();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchConversations();
+  };
+
+  const handleBroadcast = async () => {
+    if (!broadcastMessage.trim() || isBroadcasting) return;
+
+    setIsBroadcasting(true);
+    try {
+      const response = await messageService.broadcastMessage(broadcastMessage.trim());
+      if (response.success) {
+        Alert.alert('Success', response.message);
+        setBroadcastVisible(false);
+        setBroadcastMessage('');
+        fetchConversations(); // Refresh to see new messages in threads
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to send broadcast message');
+    } finally {
+      setIsBroadcasting(false);
+    }
+  };
+
+  const filteredConversations = conversations.filter(conv => 
+    conv.user.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const unreadTotal = conversations.reduce((acc, conv) => acc + (conv.unreadCount || 0), 0);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -95,34 +89,70 @@ export const CoachMessagesScreen = ({ navigation }: any) => {
           />
         </View>
 
-        <Text style={styles.unreadSummary}>7 unread messages from clients</Text>
+        {unreadTotal > 0 && (
+          <Text style={styles.unreadSummary}>{unreadTotal} unread messages from clients</Text>
+        )}
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {mockMessages.map((msg, index) => (
-            <TouchableOpacity 
-              key={msg.id} 
-              style={[styles.messageRow, index !== mockMessages.length - 1 && styles.messageRowBorder]}
-              onPress={() => navigation.navigate('AthleteChatDetail', { name: msg.name })}
-            >
-              <Image source={{ uri: msg.avatar }} style={styles.avatar} />
-              
-              <View style={styles.messageContent}>
-                <View style={styles.messageHeader}>
-                  <Text style={styles.name}>{msg.name}</Text>
-                  <Text style={styles.time}>{msg.time}</Text>
-                </View>
-                <View style={styles.messageFooter}>
-                  <Text style={styles.messageText} numberOfLines={1}>{msg.message}</Text>
-                  {msg.unread > 0 && (
-                    <View style={styles.unreadBadge}>
-                      <Text style={styles.unreadText}>{msg.unread}</Text>
+        {loading && !refreshing ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+          </View>
+        ) : (
+          <ScrollView 
+            contentContainerStyle={styles.scrollContent} 
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
+            }
+          >
+            {filteredConversations.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No clients found</Text>
+              </View>
+            ) : (
+              filteredConversations.map((conv, index) => (
+                <TouchableOpacity 
+                  key={conv.user._id} 
+                  style={[styles.messageRow, index !== filteredConversations.length - 1 && styles.messageRowBorder]}
+                  onPress={() => navigation.navigate('AthleteChatDetail', { 
+                    userId: conv.user._id,
+                    name: conv.user.name,
+                    avatar: conv.user.profilePhoto
+                  })}
+                >
+                  {conv.user.profilePhoto ? (
+                    <Image source={{ uri: conv.user.profilePhoto }} style={styles.avatar} />
+                  ) : (
+                    <View style={styles.avatarPlaceholder}>
+                      <Text style={styles.avatarText}>{conv.user.name.charAt(0)}</Text>
                     </View>
                   )}
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+                  
+                  <View style={styles.messageContent}>
+                    <View style={styles.messageHeader}>
+                      <Text style={styles.name}>{conv.user.name}</Text>
+                      {conv.lastMessage && (
+                        <Text style={styles.time}>
+                          {new Date(conv.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.messageFooter}>
+                      <Text style={styles.messageText} numberOfLines={1}>
+                        {conv.lastMessage ? conv.lastMessage.content : "No messages yet"}
+                      </Text>
+                      {conv.unreadCount > 0 && (
+                        <View style={styles.unreadBadge}>
+                          <Text style={styles.unreadText}>{conv.unreadCount}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </ScrollView>
+        )}
 
         {/* Broadcast Modal */}
         <Modal
@@ -134,7 +164,7 @@ export const CoachMessagesScreen = ({ navigation }: any) => {
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>Broadcast Message</Text>
-              <Text style={styles.modalSubtitle}>Send a message to all 7 clients at once</Text>
+              <Text style={styles.modalSubtitle}>Send a message to all your active clients at once</Text>
               
               <TextInput
                 style={styles.modalInput}
@@ -153,14 +183,15 @@ export const CoachMessagesScreen = ({ navigation }: any) => {
                   <Text style={styles.modalCancelText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
-                  style={[styles.modalSendBtn, !broadcastMessage && styles.modalSendBtnDisabled]}
-                  onPress={() => {
-                    setBroadcastVisible(false);
-                    setBroadcastMessage('');
-                  }}
-                  disabled={!broadcastMessage}
+                  style={[styles.modalSendBtn, (!broadcastMessage.trim() || isBroadcasting) && styles.modalSendBtnDisabled]}
+                  onPress={handleBroadcast}
+                  disabled={!broadcastMessage.trim() || isBroadcasting}
                 >
-                  <Text style={styles.modalSendText}>Send to All</Text>
+                  {isBroadcasting ? (
+                    <ActivityIndicator size="small" color={Colors.white} />
+                  ) : (
+                    <Text style={styles.modalSendText}>Send to All</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -230,6 +261,19 @@ const styles = StyleSheet.create({
     marginHorizontal: 24,
     marginBottom: 16,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    paddingTop: 100,
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: Colors.textMuted,
+    fontSize: 16,
+  },
   scrollContent: {
     paddingHorizontal: 24,
     paddingBottom: 100,
@@ -248,6 +292,20 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     marginRight: 16,
+  },
+  avatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#010E1F',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  avatarText: {
+    color: Colors.white,
+    fontSize: 18,
+    fontWeight: '800',
   },
   messageContent: {
     flex: 1,
@@ -370,3 +428,4 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
 });
+

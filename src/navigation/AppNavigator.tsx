@@ -44,6 +44,9 @@ import { EditProfileScreen } from '../screens/EditProfileScreen';
 import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
 import { ClientPermissionsScreen } from '../screens/ClientPermissionsScreen';
 import { NotificationSettingsScreen } from '../screens/NotificationSettingsScreen';
+import { OTPScreen } from '../screens/OTPScreen';
+import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
+import { ResetPasswordScreen } from '../screens/ResetPasswordScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -58,6 +61,7 @@ const getIcon = (routeName: string, isFocused: boolean) => {
     case 'AthleteWorkouts': return <Dumbbell size={size} color={color} />;
     case 'AthleteNutrition': return <Apple size={size} color={color} />;
     case 'AthleteCheckIn': return <LineChart size={size} color={color} />;
+    case 'AthleteMessages': return <MessageCircle size={size} color={color} />;
     case 'AthleteProfile': return <User size={size} color={color} />;
     case 'CoachHome': return <Home size={size} color={color} />;
     case 'CoachClients': return <Users size={size} color={color} />;
@@ -108,6 +112,7 @@ const AthleteTabs = () => (
     <Tab.Screen name="AthleteWorkouts" component={AthleteWorkoutsScreen} options={{ tabBarLabel: 'Workouts' }} />
     <Tab.Screen name="AthleteNutrition" component={AthleteNutritionScreen} options={{ tabBarLabel: 'Nutrition' }} />
     <Tab.Screen name="AthleteCheckIn" component={AthleteCheckInScreen} options={{ tabBarLabel: 'Metrics' }} />
+    <Tab.Screen name="AthleteMessages" component={AthleteMessagesScreen} options={{ tabBarLabel: 'Messages' }} />
     <Tab.Screen name="AthleteProfile" component={AthleteProfileScreen} options={{ tabBarLabel: 'Profile' }} />
   </Tab.Navigator>
 );
@@ -142,6 +147,9 @@ export const AppNavigator = () => {
       <Stack.Screen name="RoleSelect" component={RoleSelectScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen name="OTP" component={OTPScreen} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
       <Stack.Screen name="AthleteQuestionnaire" component={AthleteQuestionnaireScreen} />
       <Stack.Screen name="CoachProfileSetup" component={CoachProfileSetupScreen} />
       <Stack.Screen name="CoachCode" component={CoachCodeScreen} />

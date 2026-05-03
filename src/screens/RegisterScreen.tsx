@@ -11,7 +11,9 @@ import {
 } from 'react-native';
 import { Colors, Typography, BorderRadius } from '../theme';
 import { Button, Input } from '../components';
-import { ArrowLeft, User, Mail, Lock } from 'lucide-react-native';
+import { ArrowLeft, User, Mail, Lock, Link } from 'lucide-react-native';
+import { authService } from '../services/authService';
+import { Alert } from 'react-native';
 
 export const RegisterScreen = ({ navigation, route }: any) => {
   const role = route?.params?.role || 'athlete';
@@ -21,19 +23,40 @@ export const RegisterScreen = ({ navigation, route }: any) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleRegister = () => {
+  const handleRegister = async () => {
+    if (!name || !email || !password) {
+      Alert.alert('Error', 'Please fill in all required fields');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match');
+      return;
+    }
+
     Keyboard.dismiss();
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      if (isCoach) {
-        navigation.replace('CoachTabs');
-      } else {
-        navigation.replace('AthleteQuestionnaire');
+    try {
+      const response = await authService.signup({
+        name,
+        email,
+        password,
+        role,
+        referredBy: role === 'athlete' ? referralCode : undefined
+      });
+      
+      if (response.success) {
+        Alert.alert('Success', 'Account created! Please verify your email.');
+        navigation.navigate('OTP', { email, type: 'email-verification', role });
       }
-    }, 1500);
+    } catch (error: any) {
+      Alert.alert('Registration Failed', error.message || 'Something went wrong');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -102,6 +125,18 @@ export const RegisterScreen = ({ navigation, route }: any) => {
                 isPassword
               />
             </View>
+
+            {role === 'athlete' && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Referral Code (Optional)</Text>
+                <Input
+                  value={referralCode}
+                  onChangeText={setReferralCode}
+                  placeholder="Enter coach's referral code"
+                  autoCapitalize="characters"
+                />
+              </View>
+            )}
 
             <TouchableOpacity
               style={styles.signInBtn}
