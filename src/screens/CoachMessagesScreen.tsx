@@ -12,6 +12,8 @@ export const CoachMessagesScreen = ({ navigation }: any) => {
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const pollingRef = React.useRef<any>(null);
+
 
   const fetchConversations = async () => {
     try {
@@ -29,7 +31,15 @@ export const CoachMessagesScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     fetchConversations();
+    
+    // Poll for new messages every 10 seconds
+    pollingRef.current = setInterval(fetchConversations, 10000);
+    
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
   }, []);
+
 
   const onRefresh = () => {
     setRefreshing(true);

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,348 +6,308 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
+  SafeAreaView,
+  Alert,
 } from 'react-native';
-import { Colors, Typography, BorderRadius } from '../theme';
-import { Card } from '../components';
+import { Colors } from '../theme';
+import { useAuth } from '../context/AuthContext';
 import { 
-  User, 
-  Target, 
-  Ruler, 
-  Bell, 
-  Moon, 
-  Activity, 
-  MessageCircle, 
-  Calendar, 
-  HelpCircle, 
-  Star, 
-  Shield, 
-  LogOut,
+  ChevronLeft,
   ChevronRight,
-  Heart
+  User, 
+  CreditCard,
+  Users,
+  Target,
+  Calculator,
+  Bell,
+  Ruler,
+  Shield,
+  Lightbulb,
+  LogOut,
 } from 'lucide-react-native';
 
-const menuGroups = [
-  {
-    title: 'Account',
-    items: [
-      { Icon: User, label: 'Edit Profile', arrow: true },
-      { Icon: Target, label: 'My Goals', arrow: true },
-      { Icon: Ruler, label: 'Units & Measurements', arrow: true },
-    ],
-  },
-  {
-    title: 'Preferences',
-    items: [
-      { Icon: Bell, label: 'Notifications', toggle: true, defaultOn: true },
-      { Icon: Moon, label: 'Dark Mode', toggle: true, defaultOn: false },
-      { Icon: Heart, label: 'Apple Health Sync', toggle: true, defaultOn: false },
-    ],
-  },
-  {
-    title: 'Coach',
-    items: [
-      { Icon: MessageCircle, label: 'Message Coach', arrow: true },
-      { Icon: Calendar, label: 'Schedule Session', arrow: true },
-    ],
-  },
-  {
-    title: 'Support',
-    items: [
-      { Icon: HelpCircle, label: 'Help Center', arrow: true },
-      { Icon: Star, label: 'Rate the App', arrow: true },
-      { Icon: Shield, label: 'Privacy Policy', arrow: true },
-    ],
-  },
-];
+const SettingsItem = ({ 
+  icon: Icon, 
+  label, 
+  subtitle, 
+  onPress, 
+  toggle, 
+  toggleValue, 
+  onToggle,
+  iconBg = '#F1F5F9',
+  iconColor = '#64748B'
+}: any) => (
+  <TouchableOpacity 
+    style={styles.settingsItem} 
+    onPress={onPress}
+    disabled={toggle}
+  >
+    <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
+      <Icon size={20} color={iconColor} />
+    </View>
+    <View style={styles.itemTextContent}>
+      <Text style={styles.itemLabel}>{label}</Text>
+      {subtitle && <Text style={styles.itemSubtitle}>{subtitle}</Text>}
+    </View>
+    {toggle ? (
+      <Switch 
+        value={toggleValue} 
+        onValueChange={onToggle}
+        trackColor={{ false: '#E2E8F0', true: '#010E1F' }}
+        thumbColor={Colors.white}
+      />
+    ) : (
+      <ChevronRight size={20} color="#94A3B8" />
+    )}
+  </TouchableOpacity>
+);
 
 export const AthleteProfileScreen = ({ navigation }: any) => {
+  const { logout } = useAuth();
+  const [notifications, setNotifications] = useState(true);
+  const [units, setUnits] = useState(false);
+
+  const handleLogout = () => {
+    Alert.alert(
+      "Log Out",
+      "Are you sure you want to log out?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Log Out", onPress: () => logout(), style: "destructive" }
+      ]
+    );
+  };
+
   return (
-    <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {/* Profile Header */}
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        {/* Header */}
         <View style={styles.header}>
-          <View style={styles.avatarLarge}>
-            <Text style={styles.avatarText}>AJ</Text>
-          </View>
-          <Text style={styles.profileName}>Alex Johnson</Text>
-          <Text style={styles.profileEmail}>alex@example.com</Text>
-          
-          <View style={styles.coachBadge}>
-            <User size={14} color={Colors.primary} />
-            <Text style={styles.coachText}>Coach: Mark Davis</Text>
-          </View>
-
-          {/* Quick Stats */}
-          <View style={styles.quickStats}>
-            <View style={styles.quickStat}>
-              <Text style={styles.quickStatVal}>48</Text>
-              <Text style={styles.quickStatLabel}>Workouts</Text>
-            </View>
-            <View style={styles.quickStatDivider} />
-            <View style={styles.quickStat}>
-              <Text style={styles.quickStatVal}>12</Text>
-              <Text style={styles.quickStatLabel}>Streak 🔥</Text>
-            </View>
-            <View style={styles.quickStatDivider} />
-            <View style={styles.quickStat}>
-              <Text style={styles.quickStatVal}>-6 lbs</Text>
-              <Text style={styles.quickStatLabel}>Progress</Text>
-            </View>
-          </View>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <ChevronLeft size={24} color="#0F172A" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Settings</Text>
+          <View style={{ width: 40 }} />
         </View>
 
-        {/* Plan Section */}
-        <View style={styles.planSection}>
-          <Card style={styles.planCard}>
-            <View style={[styles.planIcon, { backgroundColor: Colors.primary + '10' }]}>
-              <Star size={24} color={Colors.primary} />
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          {/* Account Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>ACCOUNT</Text>
+            <View style={styles.card}>
+              <SettingsItem 
+                icon={User} 
+                label="Edit Profile" 
+                iconBg="#E0F2FE"
+                iconColor="#0EA5E9"
+                onPress={() => navigation.navigate('AthleteEditProfile')} 
+              />
+              <SettingsItem 
+                icon={CreditCard} 
+                label="Subscription & Billing" 
+                subtitle="Solo Plan - $9.99/mo"
+                iconBg="#F1F5F9"
+                iconColor="#64748B"
+                onPress={() => navigation.navigate('AthleteSubscription')} 
+              />
+              <SettingsItem 
+                icon={Users} 
+                label="Connect to a Coach" 
+                subtitle="Optional - Free with coach membership!"
+                iconBg="#DCFCE7"
+                iconColor="#10B981"
+                onPress={() => {}} 
+              />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.planTitle}>Premium Pro Athlete</Text>
-              <Text style={styles.planSub}>Next renewal: June 1, 2026</Text>
-            </View>
-            <TouchableOpacity style={styles.manageBtn}>
-              <Text style={styles.manageBtnText}>Manage</Text>
-            </TouchableOpacity>
-          </Card>
-        </View>
-
-        {menuGroups.map((group) => (
-          <View key={group.title} style={styles.menuGroup}>
-            <Text style={styles.groupTitle}>{group.title}</Text>
-            <Card style={styles.menuCard}>
-              {group.items.map((item: any, i: number) => (
-                <TouchableOpacity
-                  key={item.label}
-                  style={[styles.menuItem, i < group.items.length - 1 && styles.menuItemBorder]}
-                  onPress={() => {
-                    if (item.label === 'Message Coach') {
-                      navigation.navigate('AthleteMessages');
-                    }
-                  }}
-                >
-                  <View style={styles.menuIconBox}>
-                    <item.Icon size={18} color={Colors.textPrimary} />
-                  </View>
-                  <Text style={styles.menuLabel}>{item.label}</Text>
-                  {item.toggle ? (
-                    <Switch
-                      value={item.defaultOn}
-                      trackColor={{ false: Colors.cardBorder, true: Colors.primary }}
-                      thumbColor={Colors.white}
-                    />
-                  ) : (
-                    <ChevronRight size={18} color={Colors.textMuted} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </Card>
           </View>
-        ))}
 
-        <TouchableOpacity
-          style={styles.signOutBtn}
-          onPress={() => navigation.replace('Splash')}
-        >
-          <LogOut size={20} color={Colors.error} />
-          <Text style={styles.signOutText}>Sign Out</Text>
-        </TouchableOpacity>
-        <Text style={styles.version}>CoachMate v1.0.0</Text>
-      </ScrollView>
-    </View>
+          {/* Preferences Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>PREFERENCES</Text>
+            <View style={styles.card}>
+              <SettingsItem 
+                icon={Target} 
+                label="Update Goals" 
+                iconBg="#F1F5F9"
+                iconColor="#64748B"
+                onPress={() => {}} 
+              />
+              <SettingsItem 
+                icon={Calculator} 
+                label="Recalculate Calories" 
+                subtitle="Update your nutrition targets"
+                iconBg="#E0F7FA"
+                iconColor="#06B6D4"
+                onPress={() => {}} 
+              />
+              <View style={styles.toggleItemRow}>
+                <SettingsItem 
+                  icon={Bell} 
+                  label="Notifications" 
+                  toggle 
+                  toggleValue={notifications} 
+                  onToggle={setNotifications}
+                  iconBg="#F1F5F9"
+                  iconColor="#64748B"
+                />
+              </View>
+              <View style={styles.toggleItemRow}>
+                <SettingsItem 
+                  icon={Ruler} 
+                  label="Units" 
+                  subtitle="Imperial (lbs, in)"
+                  toggle 
+                  toggleValue={units} 
+                  onToggle={setUnits}
+                  iconBg="#F1F5F9"
+                  iconColor="#64748B"
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Security Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>SECURITY</Text>
+            <View style={styles.card}>
+              <SettingsItem 
+                icon={Shield} 
+                label="Change Password" 
+                iconBg="#F1F5F9"
+                iconColor="#64748B"
+                onPress={() => navigation.navigate('ChangePassword')} 
+              />
+            </View>
+          </View>
+
+          {/* Support Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>SUPPORT</Text>
+            <View style={styles.card}>
+              <SettingsItem 
+                icon={Lightbulb} 
+                label="Submit Feature Request" 
+                subtitle="Help us improve CoachMate"
+                iconBg="#F1F5F9"
+                iconColor="#64748B"
+                onPress={() => {}} 
+              />
+            </View>
+          </View>
+
+          {/* Logout Button */}
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <LogOut size={20} color="#F43F5E" />
+            <Text style={styles.logoutText}>Log Out</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: Colors.background 
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
   },
-  scroll: { 
-    paddingBottom: 100 
+  container: {
+    flex: 1,
   },
-  header: { 
-    paddingTop: 80, 
-    paddingBottom: 40, 
-    paddingHorizontal: 24, 
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: Colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
+    borderBottomColor: '#F1F5F9',
   },
-  avatarLarge: { 
-    width: 96, 
-    height: 96, 
-    borderRadius: 48, 
-    backgroundColor: Colors.primary, 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    marginBottom: 16 
+  backBtn: {
+    padding: 4,
   },
-  avatarText: { 
-    color: Colors.white, 
-    fontSize: 32, 
-    fontWeight: '800' 
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  profileName: { 
-    fontSize: 24, 
-    fontWeight: '800', 
-    color: Colors.textPrimary 
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 40,
   },
-  profileEmail: { 
-    fontSize: 14, 
-    color: Colors.textSecondary, 
-    marginTop: 4,
-    fontWeight: '600',
+  section: {
+    marginBottom: 24,
   },
-  coachBadge: { 
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#94A3B8',
+    letterSpacing: 1,
+    marginBottom: 12,
+    marginLeft: 8,
+  },
+  card: {
+    backgroundColor: Colors.white,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 10,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  settingsItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 12, 
-    backgroundColor: Colors.primary + '10', 
-    borderRadius: 12, 
-    paddingHorizontal: 12, 
-    paddingVertical: 6 
+    paddingVertical: 12,
   },
-  coachText: { 
-    color: Colors.primary, 
-    fontSize: 12, 
-    fontWeight: '700' 
-  },
-  quickStats: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    marginTop: 28, 
-    backgroundColor: Colors.background, 
-    borderRadius: 20, 
-    paddingVertical: 16, 
-    paddingHorizontal: 20, 
-    width: '100%',
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-  },
-  quickStat: { flex: 1, alignItems: 'center' },
-  quickStatVal: { 
-    fontSize: 18, 
-    fontWeight: '800', 
-    color: Colors.textPrimary 
-  },
-  quickStatLabel: { 
-    fontSize: 12, 
-    color: Colors.textSecondary, 
-    marginTop: 4,
-    fontWeight: '600',
-  },
-  quickStatDivider: { 
-    width: 1, 
-    height: 32, 
-    backgroundColor: Colors.divider 
-  },
-  planSection: {
-    paddingHorizontal: 24,
-    marginTop: 24,
-  },
-  planCard: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 12, 
-    padding: 16, 
-    borderWidth: 1, 
-    borderColor: Colors.primary + '20',
-  },
-  planIcon: {
-    width: 44,
-    height: 44,
+  iconBox: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 16,
   },
-  planTitle: { 
-    fontSize: 15, 
-    fontWeight: '700', 
-    color: Colors.textPrimary 
+  itemTextContent: {
+    flex: 1,
   },
-  planSub: { 
-    fontSize: 12, 
-    color: Colors.textMuted, 
-    marginTop: 2 
+  itemLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
   },
-  manageBtn: { 
-    backgroundColor: Colors.primary, 
-    borderRadius: 8, 
-    paddingHorizontal: 12, 
-    paddingVertical: 8 
+  itemSubtitle: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2,
+    fontWeight: '500',
   },
-  manageBtnText: { 
-    color: Colors.white, 
-    fontSize: 12, 
-    fontWeight: '700' 
+  toggleItemRow: {
+    borderTopWidth: 1,
+    borderTopColor: '#F8FAFC',
   },
-  menuGroup: { 
-    paddingHorizontal: 24, 
-    marginTop: 28 
-  },
-  groupTitle: { 
-    fontSize: 12, 
-    color: Colors.textMuted, 
-    fontWeight: '800', 
-    textTransform: 'uppercase', 
-    letterSpacing: 1, 
-    marginBottom: 12,
-    marginLeft: 4,
-  },
-  menuCard: { 
-    padding: 0,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  menuItem: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 14, 
-    padding: 16 
-  },
-  menuItemBorder: { 
-    borderBottomWidth: 1, 
-    borderBottomColor: Colors.divider 
-  },
-  menuIconBox: { 
-    width: 38, 
-    height: 38, 
-    borderRadius: 10, 
-    backgroundColor: Colors.background, 
-    alignItems: 'center', 
-    justifyContent: 'center' 
-  },
-  menuLabel: { 
-    flex: 1, 
-    fontSize: 15, 
-    color: Colors.textPrimary, 
-    fontWeight: '600' 
-  },
-  signOutBtn: { 
-    marginHorizontal: 24, 
-    marginTop: 32, 
-    backgroundColor: Colors.error + '10', 
-    borderRadius: 16, 
-    padding: 16, 
-    alignItems: 'center', 
-    justifyContent: 'center',
+  logoutBtn: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF1F2',
+    borderWidth: 1,
+    borderColor: '#FECDD3',
+    height: 60,
+    borderRadius: 16,
+    marginTop: 12,
     gap: 10,
-    borderWidth: 1, 
-    borderColor: Colors.error + '20' 
   },
-  signOutText: { 
-    color: Colors.error, 
-    fontWeight: '800', 
-    fontSize: 16 
-  },
-  version: { 
-    textAlign: 'center', 
-    fontSize: 12, 
-    color: Colors.textMuted, 
-    marginTop: 20 
+  logoutText: {
+    color: '#F43F5E',
+    fontSize: 16,
+    fontWeight: '800',
   },
 });
+

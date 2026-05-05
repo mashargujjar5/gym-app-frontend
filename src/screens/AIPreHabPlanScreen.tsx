@@ -1,9 +1,37 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, Platform } from 'react-native';
+import { ChevronLeft, Sparkles, Activity, AlertTriangle, AlertCircle, Scale, Database, CheckCircle2, User } from 'lucide-react-native';
 import { Colors } from '../theme';
-import { ChevronLeft, Sparkles, Activity, AlertTriangle, AlertCircle, Scale, Database, CheckCircle2 } from 'lucide-react-native';
+import { coachService } from '../services/coachService';
 
-export const AIPreHabPlanScreen = ({ navigation }: any) => {
+export const AIPreHabPlanScreen = ({ navigation, route }: any) => {
+  const [prehabData, setPrehabData] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [client, setClient] = React.useState<any>(null);
+
+  React.useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const clientsRes = await coachService.getCoachAthletes();
+      if (clientsRes.success && clientsRes.data.length > 0) {
+        const firstClient = clientsRes.data[0];
+        setClient(firstClient);
+        const prehabRes = await coachService.getClientPrehab(firstClient._id);
+        if (prehabRes.success) {
+          setPrehabData(prehabRes.data);
+        }
+      }
+    } catch (error) {
+      console.error('Fetch prehab data error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* Header Area */}
@@ -18,132 +46,82 @@ export const AIPreHabPlanScreen = ({ navigation }: any) => {
           </View>
           <View style={{ width: 40 }} />
         </View>
-        <Text style={styles.headerSub}>Smart workout planning based on your injury risk data</Text>
+        <Text style={styles.headerSub}>Smart workout planning based on {client ? `${client.name}'s` : 'client'} injury risk data</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        
-        {/* PreHab Analysis Section */}
-        <View style={styles.sectionHeaderRow}>
-          <Activity size={18} color="#06B6D4" />
-          <Text style={styles.sectionTitle}>PreHab Analysis</Text>
-        </View>
-
-        {/* Overtraining Detected */}
-        <View style={[styles.analysisCard, { borderColor: '#FECACA', backgroundColor: '#FEF2F2' }]}>
-          <View style={styles.cardTop}>
-            <AlertTriangle size={18} color="#EF4444" style={{marginRight: 8}} />
-            <Text style={[styles.cardTitle, { color: '#B91C1C' }]}>Overtraining Detected</Text>
+        {loading ? (
+          <Text style={styles.loadingText}>Analyzing data...</Text>
+        ) : !client ? (
+          <View style={styles.emptyContainer}>
+            <User size={48} color="#CBD5E1" />
+            <Text style={styles.emptyText}>No clients found to analyze</Text>
           </View>
-          <Text style={styles.cardDesc}>Elevated resting heart rate and reported fatigue</Text>
-          
-          <View style={styles.dataRow}>
-            <Text style={styles.dataLabel}>Right Shoulder</Text>
-            <View style={{flexDirection: 'row', alignItems: 'center'}}>
-              <Text style={[styles.dataVal, {color: '#EF4444'}]}>22 sets</Text>
-              <Text style={styles.dataSub}>(7 days)</Text>
+        ) : !prehabData || prehabData.message ? (
+           <View style={styles.emptyContainer}>
+            <CheckCircle2 size={48} color="#10B981" />
+            <Text style={styles.emptyText}>No injury risks detected for {client.name}</Text>
+          </View>
+        ) : (
+          <>
+            {/* Real Data Rendering would go here based on backend MobilityTest model */}
+            {/* For now, keeping the premium UI but indicating it's real data */}
+            <View style={styles.sectionHeaderRow}>
+              <Activity size={18} color="#06B6D4" />
+              <Text style={styles.sectionTitle}>Real-time Analysis for {client.name}</Text>
             </View>
-          </View>
-          <View style={styles.dataRow}>
-            <Text style={styles.dataLabel}>Left Shoulder</Text>
-            <View style={{flexDirection: 'row', alignItems: 'center'}}>
-              <Text style={[styles.dataVal, {color: '#EF4444'}]}>22 sets</Text>
-              <Text style={styles.dataSub}>(7 days)</Text>
+
+            {/* Overtraining Section (Example Mapping) */}
+            {prehabData.scores?.recovery < 50 && (
+              <View style={[styles.analysisCard, { borderColor: '#FECACA', backgroundColor: '#FEF2F2' }]}>
+                <View style={styles.cardTop}>
+                  <AlertTriangle size={18} color="#EF4444" style={{marginRight: 8}} />
+                  <Text style={[styles.cardTitle, { color: '#B91C1C' }]}>High Fatigue Detected</Text>
+                </View>
+                <Text style={styles.cardDesc}>Based on recent check-in and heart rate data</Text>
+                <View style={styles.dataRow}>
+                  <Text style={styles.dataLabel}>Recovery Score</Text>
+                  <Text style={[styles.dataVal, {color: '#EF4444'}]}>{prehabData.scores.recovery}%</Text>
+                </View>
+              </View>
+            )}
+
+            {/* Muscle Imbalance Mapping */}
+            {prehabData.imbalances && prehabData.imbalances.length > 0 && (
+              <View style={[styles.analysisCard, { borderColor: '#D9F99D', backgroundColor: '#F7FEE7' }]}>
+                <View style={styles.cardTop}>
+                  <Scale size={18} color="#84CC16" style={{marginRight: 8}} />
+                  <Text style={[styles.cardTitle, { color: '#4D7C0F' }]}>Muscle Imbalances</Text>
+                </View>
+                <Text style={styles.cardDesc}>Detected via mobility assessments</Text>
+                {prehabData.imbalances.map((imb: any, idx: number) => (
+                  <View key={idx} style={styles.dataRow}>
+                    <Text style={styles.dataLabel}>{imb.area}</Text>
+                    <Text style={[styles.dataVal, {color: '#65A30D'}]}>{imb.severity}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Recommendations mapping */}
+            <View style={[styles.sectionHeaderRow, { marginTop: 16 }]}>
+              <Sparkles size={18} color="#06B6D4" />
+              <Text style={styles.sectionTitle}>AI Recommendations</Text>
             </View>
-          </View>
-        </View>
-
-        {/* Mobility Risk Detected */}
-        <View style={[styles.analysisCard, { borderColor: '#FED7AA', backgroundColor: '#FFF7ED' }]}>
-          <View style={styles.cardTop}>
-            <AlertCircle size={18} color="#F97316" style={{marginRight: 8}} />
-            <Text style={[styles.cardTitle, { color: '#C2410C' }]}>Mobility Risk Detected</Text>
-          </View>
-          <Text style={styles.cardDesc}>High frequency in certain movement patterns</Text>
-          
-          <View style={styles.dataRow}>
-            <Text style={styles.dataLabel}>Pressing Movements</Text>
-            <Text style={[styles.dataVal, {color: '#F97316'}]}>9 sessions</Text>
-          </View>
-          <View style={styles.dataRow}>
-            <Text style={styles.dataLabel}>Squat Pattern</Text>
-            <Text style={[styles.dataVal, {color: '#F97316'}]}>6 sessions</Text>
-          </View>
-        </View>
-
-        {/* Pain Feedback Recorded */}
-        <View style={[styles.analysisCard, { borderColor: '#FDE047', backgroundColor: '#FEFCE8' }]}>
-          <View style={styles.cardTop}>
-            <Activity size={18} color="#EAB308" style={{marginRight: 8}} />
-            <Text style={[styles.cardTitle, { color: '#A16207' }]}>Pain Feedback Recorded</Text>
-          </View>
-          <Text style={styles.cardDesc}>Recent discomfort during training</Text>
-          
-          <View style={styles.dataRow}>
-            <Text style={styles.dataLabel}>Right Shoulder</Text>
-            <Text style={[styles.dataVal, {color: '#EAB308'}]}>2 sessions</Text>
-          </View>
-        </View>
-
-        {/* Muscle Imbalances */}
-        <View style={[styles.analysisCard, { borderColor: '#D9F99D', backgroundColor: '#F7FEE7' }]}>
-          <View style={styles.cardTop}>
-            <Scale size={18} color="#84CC16" style={{marginRight: 8}} />
-            <Text style={[styles.cardTitle, { color: '#4D7C0F' }]}>Muscle Imbalances</Text>
-          </View>
-          <Text style={styles.cardDesc}>Uneven training volumes detected</Text>
-          
-          <View style={styles.dataRow}>
-            <Text style={styles.dataLabel}>Chest vs Back</Text>
-            <Text style={[styles.dataVal, {color: '#65A30D'}]}>Ratio: 2:1</Text>
-          </View>
-          <View style={styles.dataRow}>
-            <Text style={styles.dataLabel}>Quads vs Hamstrings</Text>
-            <Text style={[styles.dataVal, {color: '#65A30D'}]}>Ratio: 2.5:1</Text>
-          </View>
-        </View>
-
-        {/* Underused Muscle Groups */}
-        <View style={[styles.analysisCard, { borderColor: '#BAE6FD', backgroundColor: '#F0F9FF' }]}>
-          <View style={styles.cardTop}>
-            <Database size={18} color="#3B82F6" style={{marginRight: 8}} />
-            <Text style={[styles.cardTitle, { color: '#1D4ED8' }]}>Underused Muscle Groups</Text>
-          </View>
-          <Text style={styles.cardDesc}>These areas need more attention</Text>
-          
-          <View style={styles.dataRow}>
-            <Text style={styles.dataLabel}>Core</Text>
-            <Text style={[styles.dataVal, {color: '#3B82F6'}]}>4/10 sets</Text>
-          </View>
-          <View style={styles.dataRow}>
-            <Text style={styles.dataLabel}>Hamstrings</Text>
-            <Text style={[styles.dataVal, {color: '#3B82F6'}]}>6/14 sets</Text>
-          </View>
-        </View>
-
-
-        {/* AI Recommendations Section */}
-        <View style={[styles.sectionHeaderRow, { marginTop: 16 }]}>
-          <Sparkles size={18} color="#06B6D4" />
-          <Text style={styles.sectionTitle}>AI Recommendations</Text>
-        </View>
-
-        <View style={styles.recommendationList}>
-          {[
-            'Reduce shoulder volume by 40% for next 7 days',
-            'Add mobility work and stretching for shoulders',
-            'Increase back training volume to balance chest work',
-            'Focus on hamstring exercises to balance quads',
-            'Add 2-3 core exercises per workout',
-            'Replace high-risk shoulder exercises with alternatives'
-          ].map((rec, i) => (
-            <View key={i} style={styles.recItem}>
-              <CheckCircle2 size={16} color="#06B6D4" style={{marginTop: 2, marginRight: 12}} />
-              <Text style={styles.recText}>{rec}</Text>
+            <View style={styles.recommendationList}>
+              {prehabData.recommendations && prehabData.recommendations.length > 0 ? (
+                prehabData.recommendations.map((rec: string, i: number) => (
+                  <View key={i} style={styles.recItem}>
+                    <CheckCircle2 size={16} color="#06B6D4" style={{marginTop: 2, marginRight: 12}} />
+                    <Text style={styles.recText}>{rec}</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.emptyText}>Keep up the good work! No specific pre-hab needed.</Text>
+              )}
             </View>
-          ))}
-        </View>
-
+          </>
+        )}
       </ScrollView>
 
       {/* Footer */}
@@ -294,5 +272,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: Colors.white,
+  },
+  loadingText: {
+    textAlign: 'center',
+    marginTop: 40,
+    color: '#64748B',
+    fontSize: 14,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 60,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#64748B',
+    marginTop: 16,
+    textAlign: 'center',
+    paddingHorizontal: 40,
   }
 });

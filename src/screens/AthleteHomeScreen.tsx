@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { format } from 'date-fns';
 import {
   View,
   Text,
@@ -30,6 +31,7 @@ import {
   Settings,
   MessageCircle
 } from 'lucide-react-native';
+import { workoutService } from '../services/workoutService';
 
 const { width } = Dimensions.get('window');
 
@@ -60,6 +62,63 @@ const mockRecent = [
 ];
 
 export const AthleteHomeScreen = ({ navigation }: any) => {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchDashboard = async () => {
+    try {
+      setLoading(true);
+      // We'll use workoutService or a dedicated athleteService
+      const res = await workoutService.getDashboardData(); 
+      if (res.success) {
+        setData(res.data);
+      }
+    } catch (err) {
+      console.error('Dashboard fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboard();
+  }, []);
+
+  const dashboardData = data || {
+    user: { firstName: 'Athlete', profileImage: null },
+    nutrition: null,
+    todayWorkout: null,
+    weeklySummary: { workoutsCompleted: '0/5', activeDays: 0, avgCalories: 0, avgSteps: 0 },
+    recentWorkouts: [],
+    prehabStatus: []
+  };
+
+  // Transform backend nutrition to UI rings format
+  const getNutritionRings = () => {
+    if (!dashboardData.nutrition) return mockNutrition.rings;
+    
+    const { consumedCalories, targetCalories, macros } = dashboardData.nutrition;
+    return [
+      { progress: consumedCalories / targetCalories, color: Colors.calories, label: 'Calories', current: consumedCalories.toString(), target: targetCalories.toString() },
+      { progress: macros.protein.current / macros.protein.target, color: Colors.protein, label: 'Protein', current: macros.protein.current.toString(), target: `${macros.protein.target}g` },
+      { progress: macros.carbs.current / macros.carbs.target, color: Colors.carbs, label: 'Carbs', current: macros.carbs.current.toString(), target: `${macros.carbs.target}g` },
+      { progress: macros.fat.current / macros.fat.target, color: Colors.fat, label: 'Fats', current: macros.fat.current.toString(), target: `${macros.fat.target}g` },
+      { progress: macros.fiber.current / macros.fiber.target, color: Colors.fiber, label: 'Fiber', current: macros.fiber.current.toString(), target: `${macros.fiber.target}g` },
+      { progress: macros.iron.current / macros.iron.target, color: Colors.iron, label: 'Iron', current: macros.iron.current.toString(), target: `${macros.iron.target}mg` },
+    ];
+  };
+
+  const nutritionRings = getNutritionRings();
+  const currentCalories = dashboardData.nutrition?.consumedCalories || 0;
+  const targetCalories = dashboardData.nutrition?.targetCalories || 2000;
+
+  const weeklyStats = [
+    { label: 'Completed', value: dashboardData.weeklySummary.workoutsCompleted, subtext: 'sessions', icon: CheckCircle2, color: Colors.success },
+    { label: 'Active Days', value: `${dashboardData.weeklySummary.activeDays}`, subtext: 'this week', icon: Flame, color: '#F59E0B' },
+    { label: 'Avg Burn', value: `${dashboardData.weeklySummary.avgCalories}`, subtext: 'kcal/day', icon: Activity, color: '#EF4444' },
+    { label: 'Avg Steps', value: `${dashboardData.weeklySummary.avgSteps}`, subtext: 'daily steps', icon: Clock, color: Colors.protein },
+  ];
+
   return (
     <View style={styles.container}>
       <ScrollView 
@@ -70,7 +129,7 @@ export const AthleteHomeScreen = ({ navigation }: any) => {
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>Good morning,</Text>
-            <Text style={styles.userName}>Alex</Text>
+            <Text style={styles.userName}>{dashboardData.user.firstName}</Text>
           </View>
           <View style={styles.headerRight}>
             <TouchableOpacity 
@@ -83,9 +142,13 @@ export const AthleteHomeScreen = ({ navigation }: any) => {
               </View>
             </TouchableOpacity>
             <TouchableOpacity style={styles.avatarContainer}>
-               <View style={styles.avatarFallback}>
-                 <Text style={styles.avatarText}>A</Text>
-               </View>
+               {dashboardData.user.profileImage ? (
+                 <Image source={{ uri: dashboardData.user.profileImage }} style={{ width: '100%', height: '100%' }} />
+               ) : (
+                 <View style={styles.avatarFallback}>
+                   <Text style={styles.avatarText}>{dashboardData.user.firstName[0]}</Text>
+                 </View>
+               )}
             </TouchableOpacity>
           </View>
         </View>
@@ -99,14 +162,14 @@ export const AthleteHomeScreen = ({ navigation }: any) => {
               size={width * 0.75}
               strokeWidth={10}
               gap={4}
-              rings={mockNutrition.rings.map(r => ({ progress: r.progress, color: r.color }))}
-              centerTopText={mockNutrition.currentCalories}
-              centerBottomText={`/ ${mockNutrition.targetCalories}`}
+              rings={nutritionRings.map((r: any) => ({ progress: r.progress, color: r.color }))}
+              centerTopText={currentCalories}
+              centerBottomText={`/ ${targetCalories}`}
             />
           </View>
 
           <View style={styles.legendGrid}>
-            {mockNutrition.rings.map((item, index) => (
+            {nutritionRings.map((item: any, index: number) => (
               <View key={index} style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: item.color }]} />
                 <Text style={[styles.legendLabel, { color: item.color }]}>{item.label}</Text>
@@ -121,25 +184,33 @@ export const AthleteHomeScreen = ({ navigation }: any) => {
           <Card style={styles.workoutCard}>
             <Text style={styles.workoutSubtext}>TODAY'S WORKOUT</Text>
             <View style={styles.workoutHeaderRow}>
-              <Text style={styles.workoutTitle}>Upper Body Hypertrophy</Text>
+              <Text style={styles.workoutTitle}>{dashboardData.todayWorkout?.workoutTitle || 'Rest Day'}</Text>
               <View style={styles.workoutIconBtn}>
                 <Link2 size={20} color={Colors.textSecondary} />
               </View>
             </View>
             
-            <View style={styles.workoutMetaRow}>
-              <Text style={styles.workoutMetaText}>7 exercises</Text>
-              <Text style={styles.workoutMetaDot}>•</Text>
-              <Text style={styles.workoutMetaText}>68 min</Text>
-            </View>
+            {dashboardData.todayWorkout ? (
+              <>
+                <View style={styles.workoutMetaRow}>
+                  <Text style={styles.workoutMetaText}>{dashboardData.todayWorkout.exerciseCount} exercises</Text>
+                  <Text style={styles.workoutMetaDot}>•</Text>
+                  <Text style={styles.workoutMetaText}>{dashboardData.todayWorkout.estimatedDuration}</Text>
+                </View>
 
-            <TouchableOpacity 
-              style={styles.startWorkoutBtn}
-              onPress={() => navigation.navigate('ActiveWorkout')}
-            >
-              <Play size={16} color={Colors.white} fill={Colors.white} style={{ marginRight: 8 }} />
-              <Text style={styles.startWorkoutText}>Start Workout</Text>
-            </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.startWorkoutBtn}
+                  onPress={() => navigation.navigate('ActiveWorkout', { workoutId: dashboardData.todayWorkout.id })}
+                >
+                  <Play size={16} color={Colors.white} fill={Colors.white} style={{ marginRight: 8 }} />
+                  <Text style={styles.startWorkoutText}>Start Workout</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={styles.restDayBox}>
+                <Text style={styles.restDayText}>No workout scheduled for today. Enjoy your recovery!</Text>
+              </View>
+            )}
           </Card>
         </View>
 
@@ -157,19 +228,28 @@ export const AthleteHomeScreen = ({ navigation }: any) => {
             </View>
 
             <View style={styles.alertBox}>
-              <AlertTriangle size={16} color={Colors.error} />
-              <Text style={styles.alertText}>2 Areas Need Attention</Text>
+              <AlertTriangle size={16} color={dashboardData.prehabStatus.length > 0 ? Colors.error : Colors.success} />
+              <Text style={[styles.alertText, dashboardData.prehabStatus.length === 0 && { color: Colors.success }]}>
+                {dashboardData.prehabStatus.length > 0 ? `${dashboardData.prehabStatus.length} Areas Need Attention` : 'All Systems Good'}
+              </Text>
             </View>
 
             <View style={styles.preHabStatsRow}>
-              <View style={styles.preHabStatBox}>
-                <Text style={styles.preHabStatLabel}>Overtraining</Text>
-                <Text style={[styles.preHabStatValue, { color: Colors.error }]}>Shoulders</Text>
-              </View>
-              <View style={styles.preHabStatBox}>
-                <Text style={styles.preHabStatLabel}>Mobility Risk</Text>
-                <Text style={[styles.preHabStatValue, { color: Colors.fat }]}>High</Text>
-              </View>
+              {dashboardData.prehabStatus.length > 0 ? (
+                dashboardData.prehabStatus.map((item: any, idx: number) => (
+                  <View key={idx} style={styles.preHabStatBox}>
+                    <Text style={styles.preHabStatLabel}>{item.category || 'Focus Area'}</Text>
+                    <Text style={[styles.preHabStatValue, { color: item.riskLevel === 'High' ? Colors.error : Colors.fat }]}>
+                      {item.area || item.riskLevel}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.preHabStatBox}>
+                  <Text style={styles.preHabStatLabel}>Recovery Score</Text>
+                  <Text style={[styles.preHabStatValue, { color: Colors.success }]}>Optimal</Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.preHabFooter}>
@@ -192,7 +272,7 @@ export const AthleteHomeScreen = ({ navigation }: any) => {
           </View>
           
           <View style={styles.statsGrid}>
-            {mockWeekly.map((stat, index) => (
+            {weeklyStats.map((stat, index) => (
               <Card key={index} style={styles.statCard}>
                 <View style={styles.statCardHeader}>
                   <stat.icon size={16} color={stat.color} />
@@ -209,32 +289,41 @@ export const AthleteHomeScreen = ({ navigation }: any) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Workouts</Text>
           <View style={styles.recentList}>
-            {mockRecent.map((workout, index) => (
-              <Card key={index} style={styles.recentCard}>
-                <View style={styles.recentCardTop}>
-                  <View style={styles.recentCardLeft}>
-                    <View style={styles.completedIconBox}>
-                      <CheckCircle2 size={16} color={Colors.success} />
-                    </View>
-                    <View>
-                      <Text style={styles.recentTitle}>{workout.title}</Text>
-                      <View style={styles.recentMetaRow}>
-                        <Calendar size={12} color={Colors.textMuted} />
-                        <Text style={styles.recentMetaText}>{workout.date}</Text>
+            {dashboardData.recentWorkouts.length === 0 ? (
+              <Text style={styles.emptyRecentText}>No recent workouts logged yet.</Text>
+            ) : (
+              dashboardData.recentWorkouts.map((workout: any, index: number) => (
+                <TouchableOpacity 
+                  key={index} 
+                  onPress={() => navigation.navigate('CompletedWorkoutDetail', { workoutId: workout.id })}
+                >
+                  <Card style={styles.recentCard}>
+                    <View style={styles.recentCardTop}>
+                      <View style={styles.recentCardLeft}>
+                        <View style={styles.completedIconBox}>
+                          <CheckCircle2 size={16} color={Colors.success} />
+                        </View>
+                        <View>
+                          <Text style={styles.recentTitle}>{workout.workoutTitle}</Text>
+                          <View style={styles.recentMetaRow}>
+                            <Calendar size={12} color={Colors.textMuted} />
+                            <Text style={styles.recentMetaText}>{format(new Date(workout.date), 'MMM d, h:mm a')}</Text>
+                          </View>
+                        </View>
+                      </View>
+                      <View style={styles.recentCardRight}>
+                        <Text style={styles.recentDuration}>{workout.duration} min</Text>
+                        <Text style={styles.recentCals}>{workout.caloriesBurned} kcal</Text>
                       </View>
                     </View>
-                  </View>
-                  <View style={styles.recentCardRight}>
-                    <Text style={styles.recentDuration}>{workout.duration}</Text>
-                    <Text style={styles.recentCals}>{workout.cals}</Text>
-                  </View>
-                </View>
-                <View style={styles.recentCardBottom}>
-                  <Dumbbell size={12} color={Colors.textMuted} />
-                  <Text style={styles.recentMetaText}>{workout.exercises} exercises completed</Text>
-                </View>
-              </Card>
-            ))}
+                    <View style={styles.recentCardBottom}>
+                      <Dumbbell size={12} color={Colors.textMuted} />
+                      <Text style={styles.recentMetaText}>{workout.exerciseCount} exercises completed</Text>
+                    </View>
+                  </Card>
+                </TouchableOpacity>
+              ))
+            )}
           </View>
         </View>
 
@@ -616,6 +705,22 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: Colors.background,
+  },
+  restDayBox: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  restDayText: {
+    fontSize: 14,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  emptyRecentText: {
+    fontSize: 14,
+    color: Colors.textMuted,
+    textAlign: 'center',
+    paddingVertical: 20,
   },
   bottomNav: {
     position: 'absolute',

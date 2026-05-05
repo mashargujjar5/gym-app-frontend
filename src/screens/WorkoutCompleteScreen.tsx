@@ -14,9 +14,12 @@ const mockChats = [
   { id: '3', name: 'Gym Group', sub: '12 members', isGroup: true },
 ];
 
-export const WorkoutCompleteScreen = ({ navigation }: any) => {
+export const WorkoutCompleteScreen = ({ navigation, route }: any) => {
+  const { duration, calories, volume, workoutTitle, summary } = route.params || {};
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedChat, setSelectedChat] = useState('2');
+
+  const workoutSummary = summary || mockSummary;
 
   return (
     <View style={styles.container}>
@@ -35,21 +38,25 @@ export const WorkoutCompleteScreen = ({ navigation }: any) => {
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
             <Text style={styles.statLabel}>Duration</Text>
-            <Text style={styles.statValue}>45:12</Text>
+            <Text style={styles.statValue}>{duration || '00:00'}</Text>
           </View>
           <View style={styles.statBox}>
             <Text style={styles.statLabel}>Calories</Text>
-            <Text style={styles.statValue}>342 kcal</Text>
+            <Text style={styles.statValue}>{calories || '0 kcal'}</Text>
+          </View>
+          <View style={styles.statBox}>
+            <Text style={styles.statLabel}>Volume</Text>
+            <Text style={styles.statValue}>{volume || '0 kg'}</Text>
           </View>
         </View>
 
         {/* Summary Section */}
         <Text style={styles.sectionTitle}>Summary</Text>
-        {mockSummary.map((item) => (
+        {workoutSummary.map((item: any) => (
           <View key={item.id} style={styles.summaryCard}>
             <View style={styles.summaryLeft}>
-              <View style={[styles.iconWrap, { backgroundColor: item.iconBg }]}>
-                <item.Icon size={20} color={item.iconColor} />
+              <View style={[styles.iconWrap, { backgroundColor: item.iconBg || '#F1F5F9' }]}>
+                {item.Icon ? <item.Icon size={20} color={item.iconColor} /> : <Dumbbell size={20} color={Colors.primary} />}
               </View>
               <View>
                 <Text style={styles.exerciseName}>{item.name}</Text>
@@ -84,17 +91,17 @@ export const WorkoutCompleteScreen = ({ navigation }: any) => {
             {/* Workout Preview Card */}
             <View style={styles.previewCard}>
               <View style={styles.previewHeader}>
-                <Text style={styles.previewTitle}>Upper Body Hypertrophy</Text>
+                <Text style={styles.previewTitle}>{workoutTitle || 'Upper Body Hypertrophy'}</Text>
                 <ArrowUpRight size={20} color="#0EA5E9" />
               </View>
               <View style={styles.previewStatsRow}>
                 <View style={styles.previewStat}>
                   <Text style={styles.previewStatLabel}>TOTAL VOLUME</Text>
-                  <Text style={styles.previewStatValue}>5,420 kg</Text>
+                  <Text style={styles.previewStatValue}>{volume || '0 kg'}</Text>
                 </View>
                 <View style={styles.previewStat}>
                   <Text style={styles.previewStatLabel}>DURATION</Text>
-                  <Text style={styles.previewStatValue}>58 min</Text>
+                  <Text style={styles.previewStatValue}>{duration || '0 min'}</Text>
                 </View>
               </View>
               <View style={styles.previewTopSet}>
@@ -254,7 +261,8 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
+    textTransform: 'uppercase',
   },
   footer: {
     position: 'absolute',

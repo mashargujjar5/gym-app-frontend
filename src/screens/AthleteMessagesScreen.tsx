@@ -10,6 +10,8 @@ export const AthleteMessagesScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const pollingRef = React.useRef<any>(null);
+
 
   const fetchConversations = async () => {
     try {
@@ -27,7 +29,15 @@ export const AthleteMessagesScreen = ({ navigation }: any) => {
 
   useEffect(() => {
     fetchConversations();
+    
+    // Poll for new messages every 10 seconds
+    pollingRef.current = setInterval(fetchConversations, 10000);
+    
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
   }, []);
+
 
   const onRefresh = () => {
     setRefreshing(true);

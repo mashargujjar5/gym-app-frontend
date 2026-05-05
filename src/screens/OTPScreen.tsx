@@ -14,9 +14,13 @@ import { Colors } from '../theme';
 import { Button, Input } from '../components';
 import { ArrowLeft } from 'lucide-react-native';
 import { authService } from '../services/authService';
+import { useAuth } from '../context/AuthContext';
+
 
 export const OTPScreen = ({ navigation, route }: any) => {
+  const { login } = useAuth();
   const { email, type, role } = route.params;
+
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
@@ -41,12 +45,17 @@ export const OTPScreen = ({ navigation, route }: any) => {
       if (response.success) {
         if (type === 'email-verification') {
           Alert.alert('Success', 'Email verified successfully!');
+          await login(response.user, response.token, response.refreshToken);
+          
           if (role === 'coach') {
             navigation.replace('CoachProfileSetup', { referralCode: response.user?.referralCode });
           } else {
-            navigation.replace('AthleteQuestionnaire');
+            if (!response.user.isProfileComplete) {
+              navigation.replace('AthleteQuestionnaire');
+            }
           }
         } else {
+
           navigation.navigate('ResetPassword', { email, otp });
         }
       }

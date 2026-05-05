@@ -48,6 +48,11 @@ import { OTPScreen } from '../screens/OTPScreen';
 import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { ResetPasswordScreen } from '../screens/ResetPasswordScreen';
 
+import { AthleteEditProfileScreen } from '../screens/AthleteEditProfileScreen';
+import { AthleteSubscriptionScreen } from '../screens/AthleteSubscriptionScreen';
+
+import { AuthProvider, useAuth } from '../context/AuthContext';
+
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -61,8 +66,7 @@ const getIcon = (routeName: string, isFocused: boolean) => {
     case 'AthleteWorkouts': return <Dumbbell size={size} color={color} />;
     case 'AthleteNutrition': return <Apple size={size} color={color} />;
     case 'AthleteCheckIn': return <LineChart size={size} color={color} />;
-    case 'AthleteMessages': return <MessageCircle size={size} color={color} />;
-    case 'AthleteProfile': return <User size={size} color={color} />;
+    case 'AthleteSettings': return <Settings size={size} color={color} />;
     case 'CoachHome': return <Home size={size} color={color} />;
     case 'CoachClients': return <Users size={size} color={color} />;
     case 'CoachTemplates': return <ClipboardList size={size} color={color} />;
@@ -102,25 +106,25 @@ const CustomTabBar = ({ state, descriptors, navigation }: any) => {
   );
 };
 
+
 // Athlete Tabs
 const AthleteTabs = () => (
   <Tab.Navigator
-    tabBar={(props) => <CustomTabBar {...props} />}
+    tabBar={(props) => <CustomTabBar state={props.state} descriptors={props.descriptors} navigation={props.navigation} />}
     screenOptions={{ headerShown: false }}
   >
     <Tab.Screen name="AthleteHome" component={AthleteHomeScreen} options={{ tabBarLabel: 'Home' }} />
-    <Tab.Screen name="AthleteWorkouts" component={AthleteWorkoutsScreen} options={{ tabBarLabel: 'Workouts' }} />
+    <Tab.Screen name="AthleteWorkouts" component={AthleteWorkoutsScreen} options={{ tabBarLabel: 'Training' }} />
     <Tab.Screen name="AthleteNutrition" component={AthleteNutritionScreen} options={{ tabBarLabel: 'Nutrition' }} />
-    <Tab.Screen name="AthleteCheckIn" component={AthleteCheckInScreen} options={{ tabBarLabel: 'Metrics' }} />
-    <Tab.Screen name="AthleteMessages" component={AthleteMessagesScreen} options={{ tabBarLabel: 'Messages' }} />
-    <Tab.Screen name="AthleteProfile" component={AthleteProfileScreen} options={{ tabBarLabel: 'Profile' }} />
+    <Tab.Screen name="AthleteCheckIn" component={AthleteCheckInScreen} options={{ tabBarLabel: 'Progress' }} />
+    <Tab.Screen name="AthleteSettings" component={AthleteProfileScreen} options={{ tabBarLabel: 'Settings' }} />
   </Tab.Navigator>
 );
 
 // Coach Tabs
 const CoachTabs = () => (
   <Tab.Navigator
-    tabBar={(props) => <CustomTabBar {...props} />}
+    tabBar={(props) => <CustomTabBar state={props.state} descriptors={props.descriptors} navigation={props.navigation} />}
     screenOptions={{ headerShown: false }}
   >
     <Tab.Screen name="CoachHome" component={CoachDashboardScreen} options={{ tabBarLabel: 'Home' }} />
@@ -131,60 +135,85 @@ const CoachTabs = () => (
   </Tab.Navigator>
 );
 
-// Root Navigator
-export const AppNavigator = () => {
+const Navigation = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <SplashScreen />;
+  }
+
   return (
     <Stack.Navigator
-      initialRouteName="Splash"
       screenOptions={{
         headerShown: false,
         animation: 'slide_from_right',
       }}
     >
-      {/* Auth Flow */}
-      <Stack.Screen name="Splash" component={SplashScreen} />
-      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-      <Stack.Screen name="RoleSelect" component={RoleSelectScreen} />
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="Register" component={RegisterScreen} />
-      <Stack.Screen name="OTP" component={OTPScreen} />
-      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
-      <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
-      <Stack.Screen name="AthleteQuestionnaire" component={AthleteQuestionnaireScreen} />
-      <Stack.Screen name="CoachProfileSetup" component={CoachProfileSetupScreen} />
-      <Stack.Screen name="CoachCode" component={CoachCodeScreen} />
+      {user ? (
+        // Authenticated Flow
+        user.role === 'coach' ? (
+          <>
+            <Stack.Screen name="CoachTabs" component={CoachTabs} />
+            <Stack.Screen name="ClientDetail" component={ClientDetailScreen} />
+            <Stack.Screen name="AssignPlan" component={AssignPlanScreen} />
+            <Stack.Screen name="AssignNutrition" component={AssignNutritionScreen} />
+            <Stack.Screen name="ProgressCompare" component={ProgressCompareScreen} />
+            <Stack.Screen name="InviteClient" component={InviteClientScreen} />
+            <Stack.Screen name="CheckInHistory" component={CheckInHistoryScreen} />
+            <Stack.Screen name="CreateWorkoutOption" component={CreateWorkoutOptionScreen} />
+            <Stack.Screen name="CreateTemplate" component={CreateTemplateScreen} />
+            <Stack.Screen name="AIPreHabPlan" component={AIPreHabPlanScreen} />
+            <Stack.Screen name="AIWorkoutGenerator" component={AIWorkoutGeneratorScreen} />
+            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+            <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+            <Stack.Screen name="ClientPermissions" component={ClientPermissionsScreen} />
+            <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+            <Stack.Screen name="CoachMessages" component={CoachMessagesScreen} />
+            <Stack.Screen name="AthleteChatDetail" component={AthleteChatDetailScreen} />
+            <Stack.Screen name="CoachProfileSetup" component={CoachProfileSetupScreen} />
+            <Stack.Screen name="CoachCode" component={CoachCodeScreen} />
+          </>
 
-      {/* Athlete Flow */}
-      <Stack.Screen name="AthleteTabs" component={AthleteTabs} />
-      <Stack.Screen name="ActiveWorkout" component={ActiveWorkoutScreen} options={{ animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="WorkoutComplete" component={WorkoutCompleteScreen} options={{ animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="CompletedWorkoutDetail" component={CompletedWorkoutDetailScreen} />
-      <Stack.Screen name="AthleteMessages" component={AthleteMessagesScreen} />
-      <Stack.Screen name="AthleteChatDetail" component={AthleteChatDetailScreen} />
-
-      {/* Coach Flow */}
-      <Stack.Screen name="CoachTabs" component={CoachTabs} />
-      <Stack.Screen name="ClientDetail" component={ClientDetailScreen} />
-      <Stack.Screen name="AssignPlan" component={AssignPlanScreen} />
-      <Stack.Screen name="AssignNutrition" component={AssignNutritionScreen} />
-      <Stack.Screen name="ProgressCompare" component={ProgressCompareScreen} />
-      <Stack.Screen name="InviteClient" component={InviteClientScreen} />
-      <Stack.Screen name="CheckInHistory" component={CheckInHistoryScreen} />
-      
-      {/* Template Flow */}
-      <Stack.Screen name="CreateWorkoutOption" component={CreateWorkoutOptionScreen} />
-      <Stack.Screen name="CreateTemplate" component={CreateTemplateScreen} />
-      <Stack.Screen name="AIPreHabPlan" component={AIPreHabPlanScreen} />
-      <Stack.Screen name="AIWorkoutGenerator" component={AIWorkoutGeneratorScreen} />
-
-      {/* Settings Flow */}
-      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
-      <Stack.Screen name="ClientPermissions" component={ClientPermissionsScreen} />
-      <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+        ) : (
+          <>
+            <Stack.Screen name="AthleteTabs" component={AthleteTabs} />
+            <Stack.Screen name="ActiveWorkout" component={ActiveWorkoutScreen} options={{ animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="WorkoutComplete" component={WorkoutCompleteScreen} options={{ animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="CompletedWorkoutDetail" component={CompletedWorkoutDetailScreen} />
+            <Stack.Screen name="AthleteMessages" component={AthleteMessagesScreen} />
+            <Stack.Screen name="AthleteChatDetail" component={AthleteChatDetailScreen} />
+            <Stack.Screen name="AthleteQuestionnaire" component={AthleteQuestionnaireScreen} />
+            <Stack.Screen name="AthleteEditProfile" component={AthleteEditProfileScreen} />
+            <Stack.Screen name="AthleteSubscription" component={AthleteSubscriptionScreen} />
+            <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+          </>
+        )
+      ) : (
+        // Auth Flow
+        <>
+          <Stack.Screen name="Splash" component={SplashScreen} />
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+          <Stack.Screen name="RoleSelect" component={RoleSelectScreen} />
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+          <Stack.Screen name="OTP" component={OTPScreen} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+        </>
+      )}
     </Stack.Navigator>
   );
 };
+
+// Root Navigator
+export const AppNavigator = () => {
+  return (
+    <AuthProvider>
+      <Navigation />
+    </AuthProvider>
+  );
+};
+
 
 const styles = StyleSheet.create({
   tabBar: {

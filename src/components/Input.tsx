@@ -15,6 +15,7 @@ interface InputProps extends TextInputProps {
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   isPassword?: boolean;
+  containerStyle?: any;
 }
 
 export const Input: React.FC<InputProps> = ({
@@ -23,24 +24,26 @@ export const Input: React.FC<InputProps> = ({
   leftIcon,
   rightIcon,
   isPassword = false,
+  containerStyle,
   ...props
 }) => {
   const [secureText, setSecureText] = useState(isPassword);
   const [focused, setFocused] = useState(false);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, containerStyle]}>
       {label && <Text style={styles.label}>{label}</Text>}
       <View
         style={[
           styles.inputWrapper,
           focused && { borderColor: Colors.primary },
           error ? { borderColor: Colors.error } : null,
+          props.multiline && { height: 120, alignItems: 'flex-start' }
         ]}
       >
         {leftIcon && <View style={styles.iconLeft}>{leftIcon}</View>}
         <TextInput
-          style={styles.input}
+          style={[styles.input, props.multiline && { textAlignVertical: 'top', paddingTop: 12 }]}
           placeholderTextColor={Colors.textMuted}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -8,20 +8,84 @@ import {
   SafeAreaView, 
   Modal, 
   TextInput,
-  Platform
+  Platform,
+  Alert,
+  ActivityIndicator
 } from 'react-native';
 import { Colors } from '../theme';
-import { ChevronLeft, Share2, Plus, Mail, X, RefreshCw, Lightbulb } from 'lucide-react-native';
-
-const pendingInvites = [
-  { id: '1', email: 'sarah.johnson@email.com', sent: 'Sent 2 days ago' },
-  { id: '2', email: 'mike.anderson@email.com', sent: 'Sent 4 days ago' },
-  { id: '3', email: 'emily.davis@email.com', sent: 'Sent 6 days ago' },
-];
+import { ChevronLeft, Share2, Plus, Mail, X, RefreshCw, Lightbulb, Clock } from 'lucide-react-native';
+import { coachService } from '../services/coachService';
+import { formatDistanceToNow } from 'date-fns';
 
 export const InviteClientScreen = ({ navigation }: any) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
+  const [invites, setInvites] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    fetchInvites();
+  }, []);
+
+  const fetchInvites = async () => {
+    try {
+      setLoading(true);
+      const res = await coachService.getInvites();
+      if (res.success) {
+        setInvites(res.data);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendInvite = async () => {
+    if (!inviteEmail) {
+      Alert.alert('Error', 'Please enter an email address');
+      return;
+    }
+
+    try {
+      setSending(true);
+      const res = await coachService.sendInvite(inviteEmail);
+      if (res.success) {
+        Alert.alert('Success', 'Invitation sent successfully');
+        setModalVisible(false);
+        setInviteEmail('');
+        fetchInvites();
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to send invitation');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleResendInvite = async (id: string) => {
+    try {
+      const res = await coachService.resendInvite(id);
+      if (res.success) {
+        Alert.alert('Success', 'Invitation resent successfully');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to resend invitation');
+    }
+  };
+
+  const handleCancelInvite = async (id: string) => {
+    try {
+      const res = await coachService.cancelInvite(id);
+      if (res.success) {
+        setInvites(prev => prev.filter(inv => inv.id !== id && inv._id !== id));
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to cancel invitation');
+      fetchInvites();
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -59,36 +123,53 @@ export const InviteClientScreen = ({ navigation }: any) => {
                 <Plus size={16} color={Colors.white} />
               </TouchableOpacity>
               <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>3</Text>
+                <Text style={styles.countBadgeText}>{invites.length}</Text>
               </View>
             </View>
           </View>
 
           {/* Invite Cards */}
-          {pendingInvites.map((invite) => (
-            <View key={invite.id} style={styles.inviteCard}>
-              <View style={styles.inviteCardTop}>
-                <View style={styles.mailIconBox}>
-                  <Mail size={16} color="#06B6D4" />
-                </View>
-                <View style={styles.inviteInfo}>
-                  <Text style={styles.inviteEmail}>{invite.email}</Text>
-                  <View style={styles.timeRow}>
-                    <ClockIcon size={12} color="#94A3B8" style={{marginRight: 4}} />
-                    <Text style={styles.inviteTime}>{invite.sent}</Text>
+          {loading ? (
+            <ActivityIndicator size="large" color={Colors.primary} style={{ marginVertical: 20 }} />
+          ) : invites.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Mail size={40} color="#94A3B8" />
+              <Text style={styles.emptyStateText}>No pending invitations</Text>
+            </View>
+          ) : (
+            invites.map((invite) => (
+              <View key={invite.id} style={styles.inviteCard}>
+                <View style={styles.inviteCardTop}>
+                  <View style={styles.mailIconBox}>
+                    <Mail size={16} color="#06B6D4" />
                   </View>
+                  <View style={styles.inviteInfo}>
+                    <Text style={styles.inviteEmail}>{invite.email}</Text>
+                    <View style={styles.timeRow}>
+                      <Clock size={12} color="#94A3B8" style={{marginRight: 4}} />
+                      <Text style={styles.inviteTime}>
+                        Sent {formatDistanceToNow(new Date(invite.sentAt))} ago
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity 
+                    style={styles.deleteBtn}
+                    onPress={() => handleCancelInvite(invite.id)}
+                  >
+                    <X size={16} color="#EF4444" />
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity style={styles.deleteBtn}>
-                  <X size={16} color="#EF4444" />
+                
+                <TouchableOpacity 
+                  style={styles.resendBtn}
+                  onPress={() => handleResendInvite(invite.id)}
+                >
+                  <RefreshCw size={14} color="#06B6D4" style={{marginRight: 8}} />
+                  <Text style={styles.resendBtnText}>Resend Invitation</Text>
                 </TouchableOpacity>
               </View>
-              
-              <TouchableOpacity style={styles.resendBtn}>
-                <RefreshCw size={14} color="#06B6D4" style={{marginRight: 8}} />
-                <Text style={styles.resendBtnText}>Resend Invitation</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
+            ))
+          )}
 
           {/* Pro Tip */}
           <View style={styles.proTipCard}>
@@ -127,11 +208,23 @@ export const InviteClientScreen = ({ navigation }: any) => {
                 autoCapitalize="none"
               />
 
-              <TouchableOpacity style={styles.sendInviteBtn} onPress={() => setModalVisible(false)}>
-                <Text style={styles.sendInviteBtnText}>Send Invite</Text>
+              <TouchableOpacity 
+                style={styles.sendInviteBtn} 
+                onPress={handleSendInvite}
+                disabled={sending}
+              >
+                {sending ? (
+                  <ActivityIndicator color={Colors.white} />
+                ) : (
+                  <Text style={styles.sendInviteBtnText}>Send Invite</Text>
+                )}
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.cancelTextBtn} onPress={() => setModalVisible(false)}>
+              <TouchableOpacity 
+                style={styles.cancelTextBtn} 
+                onPress={() => setModalVisible(false)}
+                disabled={sending}
+              >
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
             </View>
@@ -142,13 +235,6 @@ export const InviteClientScreen = ({ navigation }: any) => {
     </SafeAreaView>
   );
 };
-
-// Simple proxy for Clock icon which seems to be missing from lucide-react-native sometimes
-const ClockIcon = ({ size, color, style }: any) => (
-  <View style={style}>
-    <Text style={{color, fontSize: size, lineHeight: size}}>⏱</Text>
-  </View>
-);
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -391,5 +477,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: '#0F172A',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#E2E8F0',
+  },
+  emptyStateText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#94A3B8',
+    fontWeight: '600',
   },
 });

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { format } from 'date-fns';
 import {
   View,
   Text,
@@ -8,69 +9,184 @@ import {
   Modal,
   Image,
   Dimensions,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { Colors } from '../theme';
 import { Card } from '../components';
-import { ChevronLeft, ChevronDown, CheckSquare, Square, Info, TrendingUp, Medal, ShieldAlert, X, AlertTriangle, CheckCircle2 } from 'lucide-react-native';
+import { ChevronLeft, ChevronDown, CheckSquare, Square, Info, TrendingUp, Medal, ShieldAlert, X, AlertTriangle, CheckCircle2, Clock, Flame, Dumbbell, Activity } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
-
-const mockExercises = [
-  {
-    id: '1',
-    name: 'Barbell Bench Press',
-    image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=200&h=200&fit=crop',
-    completedSets: 0,
-    totalSets: 2,
-    sets: [
-      { id: '1', setNum: 1, kg: 100, rep: 8, rpe: '-', done: false },
-      { id: '2', setNum: 2, kg: 100, rep: 8, rpe: '-', done: false },
-    ]
-  },
-  {
-    id: '2',
-    name: 'Incline Dumbbell Press',
-    image: 'https://images.unsplash.com/photo-1581009146145-b5ef050c2e1e?w=200&h=200&fit=crop',
-    completedSets: 0,
-    totalSets: 3,
-    sets: [
-      { id: '1', setNum: 1, kg: 35, rep: 10, rpe: '8', done: false },
-      { id: '2', setNum: 2, kg: 35, rep: 10, rpe: '8', done: false },
-      { id: '3', setNum: 3, kg: 35, rep: 10, rpe: '8.5', done: false },
-    ]
-  },
-];
+import { workoutService } from '../services/workoutService';
 
 type ModalType = 'about' | 'progress' | 'records' | 'prehab' | null;
 
-export const ActiveWorkoutScreen = ({ navigation }: any) => {
-  const [exercises, setExercises] = useState(mockExercises);
-  const [activeExercise, setActiveExercise] = useState('1');
+export const ActiveWorkoutScreen = ({ navigation, route }: any) => {
+  const { workoutId } = route.params || {};
+  const [workout, setWorkout] = useState<any>(null);
+  const [exercises, setExercises] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [startTime] = useState(new Date());
+  const [elapsedTime, setElapsedTime] = useState(0);
+  
+  const [activeExercise, setActiveExercise] = useState('');
   const [showRestModal, setShowRestModal] = useState(false);
-  const [restTime, setRestTime] = useState(117);
-  const [showCustomTime, setShowCustomTime] = useState(false);
-  const [customTimeInput, setCustomTimeInput] = useState('01:30');
+  const [restTime, setRestTime] = useState(60);
   const [feelState, setFeelState] = useState<'good' | 'discomfort' | null>(null);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
 
-  const formatTime = (seconds: number) => {
+  useEffect(() => {
+    if (workoutId) {
+      fetchWorkout();
+    }
+    
+    const interval = setInterval(() => {
+      setElapsedTime(prev => prev + 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [workoutId]);
+
+  // Rest Timer Logic
+  useEffect(() => {
+    let restInterval: any;
+    if (showRestModal && restTime > 0) {
+      restInterval = setInterval(() => {
+        setRestTime(prev => prev - 1);
+      }, 1000);
+    } else if (restTime === 0) {
+      setShowRestModal(false);
+    }
+    return () => clearInterval(restInterval);
+  }, [showRestModal, restTime]);
+
+  const fetchWorkout = async () => {
+    try {
+      setLoading(true);
+      const res = await workoutService.getWorkoutDetail(workoutId);
+      if (res.success) {
+        setWorkout(res.data);
+        // Map backend exercises to logging format
+        const mappedExercises = res.data.exercises.map((ex: any, idx: number) => ({
+          id: ex._id || idx.toString(),
+          name: ex.name,
+          image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=200&h=200&fit=crop',
+          completedSets: 0,
+          totalSets: ex.sets,
+          sets: Array.from({ length: ex.sets }).map((_, i) => ({
+            id: `${idx}-${i}`,
+            setNum: i + 1,
+            kg: 0,
+            rep: parseInt(ex.reps) || 10,
+            rpe: '-',
+            done: false
+          }))
+        }));
+        setExercises(mappedExercises);
+        if (mappedExercises.length > 0) setActiveExercise(mappedExercises[0].id);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatSeconds = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    return `${h > 0 ? h + ':' : ''}${m < 10 && h > 0 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  const formatRestTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  const handleComplete = async () => {
+    try {
+      // Calculate total volume
+      let totalVolume = 0;
+      const flatSets: any[] = [];
+      
+      exercises.forEach(ex => {
+        ex.sets.forEach((set: any) => {
+          if (set.done) {
+            totalVolume += (set.kg * set.rep);
+            flatSets.push({
+              exerciseName: ex.name,
+              setNumber: set.setNum,
+              weight: set.kg,
+              reps: set.rep,
+              isCompleted: true
+            });
+          }
+        });
+      });
+
+      const workoutData = {
+        workoutId: workoutId,
+        title: workout?.name || 'Workout',
+        totalTime: Math.floor(elapsedTime / 60),
+        calories: Math.floor((elapsedTime / 60) * 8), // Rough estimate: 8 cal/min
+        volume: totalVolume,
+        mood: feelState || 'neutral',
+        sets: flatSets
+      };
+
+      const res = await workoutService.completeWorkout(workoutData);
+      if (res.success) {
+        navigation.navigate('WorkoutComplete', { 
+          duration: formatSeconds(elapsedTime), 
+          calories: `${workoutData.calories} kcal`,
+          volume: `${totalVolume} kg`,
+          workoutTitle: workout?.name || 'Workout',
+          summary: exercises.map(ex => ({
+            id: ex.id,
+            name: ex.name,
+            details: `${ex.completedSets} sets completed`,
+            status: 'Completed',
+            statusColor: Colors.success
+          }))
+        });
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const updateSetData = (exerciseId: string, setId: string, field: string, value: string) => {
+    setExercises(prev => prev.map(ex => {
+      if (ex.id === exerciseId) {
+        const newSets = ex.sets.map((set: any) => {
+          if (set.id === setId) {
+            return { ...set, [field]: value };
+          }
+          return set;
+        });
+        return { ...ex, sets: newSets };
+      }
+      return ex;
+    }));
+  };
+
   const toggleSetDone = (exerciseId: string, setId: string) => {
     setExercises(prev => prev.map(ex => {
       if (ex.id === exerciseId) {
-        const newSets = ex.sets.map(set => {
+        const newSets = ex.sets.map((set: any) => {
           if (set.id === setId) {
             const wasDone = set.done;
-            if (!wasDone) setShowRestModal(true);
+            if (!wasDone) {
+              setRestTime(90); // 90 seconds rest
+              setShowRestModal(true);
+            }
             return { ...set, done: !wasDone };
           }
           return set;
         });
-        return { ...ex, sets: newSets, completedSets: newSets.filter(s => s.done).length };
+        return { ...ex, sets: newSets, completedSets: newSets.filter((s: any) => s.done).length };
       }
       return ex;
     }));
@@ -243,38 +359,69 @@ export const ActiveWorkoutScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      {/* Dark Header Section */}
+      {/* Premium Header Section */}
       <View style={styles.headerContainer}>
         <View style={styles.headerTop}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <ChevronLeft size={24} color={Colors.white} />
+            <ChevronLeft size={24} color={Colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Active Workout</Text>
-          <View style={styles.totalTimeBox}>
-            <Text style={styles.totalTimeLabel}>TOTAL TIME</Text>
-            <Text style={styles.totalTimeValue}>0:32:14</Text>
-          </View>
-        </View>
-
-        <View style={styles.restingStatusBox}>
-          <View style={styles.restingLeft}>
-             <View style={styles.restingIndicator} />
-             <View>
-               <Text style={styles.restingLabel}>RESTING</Text>
-               <Text style={styles.restingValue}>0:03</Text>
-             </View>
-          </View>
-          <TouchableOpacity style={styles.stopBtn}>
-            <Text style={styles.stopBtnText}>Stop</Text>
+          <Text style={styles.headerTitle}>{workout?.name || 'Active Workout'}</Text>
+          <TouchableOpacity style={styles.moreBtn}>
+             <Info size={20} color={Colors.textPrimary} />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.sessionBox}>
-          <Text style={styles.sessionLabel}>Today's Session</Text>
-          <Text style={styles.sessionTitle}>Chest & Triceps</Text>
-          <Text style={styles.sessionMeta}>3 exercises   •   45-60 min</Text>
+        <Text style={styles.dateText}>{format(new Date(), 'EEEE, MMMM d')}</Text>
+
+        <View style={styles.statsOverviewRow}>
+          <View style={styles.statOverviewItem}>
+            <View style={[styles.statIconCircle, { backgroundColor: '#F0F9FF' }]}>
+              <Clock size={16} color="#0EA5E9" />
+            </View>
+            <View>
+              <Text style={styles.statOverviewLabel}>TIME</Text>
+              <Text style={styles.statOverviewValue}>{formatSeconds(elapsedTime)}</Text>
+            </View>
+          </View>
+          
+          <View style={styles.statDivider} />
+
+          <View style={styles.statOverviewItem}>
+            <View style={[styles.statIconCircle, { backgroundColor: '#FEF2F2' }]}>
+              <Flame size={16} color="#EF4444" />
+            </View>
+            <View>
+              <Text style={styles.statOverviewLabel}>CALORIES</Text>
+              <Text style={styles.statOverviewValue}>350 kcal</Text>
+            </View>
+          </View>
+
+          <View style={styles.statDivider} />
+
+          <View style={styles.statOverviewItem}>
+            <View style={[styles.statIconCircle, { backgroundColor: '#F0FDF4' }]}>
+              <Dumbbell size={16} color="#10B981" />
+            </View>
+            <View>
+              <Text style={styles.statOverviewLabel}>EXERCISES</Text>
+              <Text style={styles.statOverviewValue}>{exercises.length}</Text>
+            </View>
+          </View>
         </View>
       </View>
+
+      {/* Rest Timer Banner */}
+      {showRestModal && (
+        <View style={styles.restBanner}>
+          <View style={styles.restBannerLeft}>
+            <Activity size={16} color={Colors.white} />
+            <Text style={styles.restBannerText}>RESTING: {formatRestTime(restTime)}</Text>
+          </View>
+          <TouchableOpacity onPress={() => setShowRestModal(false)}>
+            <Text style={styles.skipText}>SKIP</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {exercises.map((exercise) => {
@@ -325,12 +472,37 @@ export const ActiveWorkoutScreen = ({ navigation }: any) => {
                     <Text style={[styles.thText, { width: 50, textAlign: 'center' }]}>Done</Text>
                   </View>
 
-                  {exercise.sets.map((set) => (
+                  {exercise.sets.map((set: any) => (
                     <View key={set.id} style={[styles.tr, set.done && styles.trDone]}>
                       <Text style={[styles.tdText, { width: 30, fontWeight: '700' }]}>{set.setNum}</Text>
-                      <View style={styles.inputBox}><Text style={styles.inputText}>{set.kg}</Text></View>
-                      <View style={styles.inputBox}><Text style={styles.inputText}>{set.rep}</Text></View>
-                      <View style={styles.inputBox}><Text style={styles.inputText}>{set.rpe}</Text></View>
+                      <View style={styles.inputBox}>
+                        <TextInput 
+                          style={styles.inputText}
+                          value={set.kg.toString()}
+                          keyboardType="numeric"
+                          onChangeText={(val) => updateSetData(exercise.id, set.id, 'kg', val)}
+                          editable={!set.done}
+                        />
+                      </View>
+                      <View style={styles.inputBox}>
+                        <TextInput 
+                          style={styles.inputText}
+                          value={set.rep.toString()}
+                          keyboardType="numeric"
+                          onChangeText={(val) => updateSetData(exercise.id, set.id, 'rep', val)}
+                          editable={!set.done}
+                        />
+                      </View>
+                      <View style={styles.inputBox}>
+                        <TextInput 
+                          style={styles.inputText}
+                          value={set.rpe}
+                          onChangeText={(val) => updateSetData(exercise.id, set.id, 'rpe', val)}
+                          editable={!set.done}
+                          placeholder="-"
+                          placeholderTextColor={Colors.textMuted}
+                        />
+                      </View>
                       <TouchableOpacity 
                         style={styles.checkboxContainer}
                         onPress={() => toggleSetDone(exercise.id, set.id)}
@@ -372,7 +544,7 @@ export const ActiveWorkoutScreen = ({ navigation }: any) => {
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.completeBtn} onPress={() => navigation.navigate('WorkoutComplete', { duration: '45:12', calories: '342 kcal' })}>
+        <TouchableOpacity style={styles.completeBtn} onPress={handleComplete}>
           <Text style={styles.completeBtnText}>Complete Workout</Text>
         </TouchableOpacity>
       </View>
@@ -398,7 +570,7 @@ export const ActiveWorkoutScreen = ({ navigation }: any) => {
             
             <View style={styles.restCircleContainer}>
               <View style={styles.restCircle}>
-                <Text style={styles.restCircleText}>{formatTime(restTime)}</Text>
+                <Text style={styles.restCircleText}>{formatRestTime(restTime)}</Text>
               </View>
             </View>
 
@@ -418,9 +590,6 @@ export const ActiveWorkoutScreen = ({ navigation }: any) => {
               <Text style={styles.skipRestText}>Skip Rest</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => { setShowRestModal(false); setShowCustomTime(true); }}>
-              <Text style={styles.customTimeLink}>Custom Time</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -435,46 +604,104 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
   },
   headerContainer: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.white,
     paddingTop: 60,
     paddingBottom: 24,
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 10,
+    zIndex: 10,
   },
   headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 8,
   },
-  backBtn: { padding: 4 },
-  headerTitle: { color: Colors.white, fontSize: 18, fontWeight: '700' },
-  totalTimeBox: { alignItems: 'flex-end' },
-  totalTimeLabel: { color: Colors.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  totalTimeValue: { color: Colors.white, fontSize: 14, fontWeight: '700' },
-  restingStatusBox: {
-    backgroundColor: '#1E293B', borderRadius: 16, padding: 16,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16,
+  backBtn: { padding: 8, marginLeft: -8 },
+  headerTitle: { color: Colors.textPrimary, fontSize: 18, fontWeight: '800' },
+  moreBtn: { padding: 8, marginRight: -8 },
+  dateText: { fontSize: 12, color: Colors.textMuted, fontWeight: '600', marginBottom: 20 },
+  statsOverviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 12,
   },
-  restingLeft: { flexDirection: 'row', alignItems: 'center' },
-  restingIndicator: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#0EA5E9', marginRight: 12 },
-  restingLabel: { color: Colors.textMuted, fontSize: 10, fontWeight: '700', letterSpacing: 1 },
-  restingValue: { color: '#0EA5E9', fontSize: 18, fontWeight: '800' },
-  stopBtn: { backgroundColor: '#EF4444', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  stopBtnText: { color: Colors.white, fontWeight: '700', fontSize: 12 },
-  sessionBox: { backgroundColor: '#1E293B', borderRadius: 16, padding: 16 },
-  sessionLabel: { color: Colors.textMuted, fontSize: 12, marginBottom: 4 },
-  sessionTitle: { color: Colors.white, fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  sessionMeta: { color: Colors.textMuted, fontSize: 12 },
-  scrollContent: { padding: 20, paddingBottom: 100 },
-  exerciseCard: { marginBottom: 16, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: Colors.cardBorder },
-  exerciseCardActive: { borderColor: Colors.primary },
+  statOverviewItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  statIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statOverviewLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: Colors.textMuted,
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  statOverviewValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+  },
+  statDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: '#F1F5F9',
+  },
+  restBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0EA5E9',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginTop: -20,
+    marginHorizontal: 20,
+    borderRadius: 16,
+    shadowColor: '#0EA5E9',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 20,
+  },
+  restBannerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  restBannerText: { color: Colors.white, fontWeight: '800', fontSize: 12 },
+  skipText: { color: Colors.white, fontWeight: '800', fontSize: 11, letterSpacing: 1 },
+  scrollContent: { padding: 20, paddingTop: 30, paddingBottom: 100 },
+  exerciseCard: { 
+    marginBottom: 16, 
+    padding: 16, 
+    borderRadius: 20, 
+    borderWidth: 1, 
+    borderColor: '#F1F5F9',
+    backgroundColor: Colors.white,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  exerciseCardActive: { borderColor: Colors.primary, borderWidth: 2 },
   exerciseHeader: { flexDirection: 'row', alignItems: 'center' },
-  exerciseImg: { width: 48, height: 48, borderRadius: 8, backgroundColor: Colors.cardBorder },
-  exerciseInfo: { flex: 1, marginLeft: 12 },
-  exerciseName: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary, marginBottom: 4 },
-  exerciseSetsMeta: { fontSize: 12, color: Colors.textMuted },
+  exerciseImg: { width: 56, height: 56, borderRadius: 14, backgroundColor: '#F8FAFC' },
+  exerciseInfo: { flex: 1, marginLeft: 16 },
+  exerciseName: { fontSize: 17, fontWeight: '800', color: Colors.textPrimary, marginBottom: 4 },
+  exerciseSetsMeta: { fontSize: 12, color: Colors.textMuted, fontWeight: '500' },
   exerciseBody: { marginTop: 20 },
   actionButtonsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 },
   actionBtn: { alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surfaceLight, paddingVertical: 12, paddingHorizontal: 16, borderRadius: 16, width: '23%' },
@@ -484,8 +711,8 @@ const styles = StyleSheet.create({
   tr: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingHorizontal: 8 },
   trDone: { opacity: 0.5 },
   tdText: { fontSize: 14, color: Colors.textPrimary, fontWeight: '600' },
-  inputBox: { flex: 1, backgroundColor: Colors.surfaceLight, paddingVertical: 10, marginHorizontal: 4, borderRadius: 8, alignItems: 'center' },
-  inputText: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
+  inputBox: { flex: 1, backgroundColor: Colors.surfaceLight, paddingVertical: 4, marginHorizontal: 4, borderRadius: 8, alignItems: 'center' },
+  inputText: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary, padding: 0, height: 36, textAlign: 'center', width: '100%' },
   checkboxContainer: { width: 50, alignItems: 'center', justifyContent: 'center' },
   preHabCheckContainer: { backgroundColor: '#F0F9FF', padding: 16, borderRadius: 16, marginTop: 16 },
   preHabCheckTitle: { fontSize: 12, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center', marginBottom: 12 },
@@ -509,6 +736,7 @@ const styles = StyleSheet.create({
   dragHandle: { width: 40, height: 4, backgroundColor: Colors.cardBorder, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
   closeSheetBtn: { position: 'absolute', top: 24, right: 24, zIndex: 10 },
   modalTitle: { fontSize: 24, fontWeight: '800', color: Colors.textPrimary, marginBottom: 24, paddingRight: 40 },
+  aboutContent: { marginTop: 8 },
   
   // About
   aboutSub: { fontSize: 16, fontWeight: '700', marginBottom: 16 },

@@ -1,20 +1,54 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, TextInput, Platform, Image } from 'react-native';
 import { Colors } from '../theme';
-import { ChevronLeft, Search, Calendar, CheckCircle2, Circle } from 'lucide-react-native';
-
-const clientsData = [
-  { id: '1', name: 'Sarah Johnson', status: 'active', joined: 'Jan 15, 2026', avatar: 'SJ', color: '#EF4444' },
-  { id: '2', name: 'Mike Thompson', status: 'active', joined: 'Feb 2, 2026', avatar: 'MT', color: '#F59E0B' },
-  { id: '3', name: 'Emily Chen', status: 'active', joined: 'Feb 20, 2026', avatar: 'EC', color: '#10B981' },
-  { id: '4', name: 'David Martinez', status: 'active', joined: 'Mar 1, 2026', avatar: 'DM', color: '#3B82F6' },
-  { id: '5', name: 'Jessica Lee', status: 'active', joined: 'Mar 5, 2026', avatar: 'JL', color: '#6366F1' },
-];
+import { ChevronLeft, Search, Calendar, CheckCircle2, Circle, AlertCircle } from 'lucide-react-native';
+import { coachService } from '../services/coachService';
+import { templateService } from '../services/templateService';
 
 export const AssignPlanScreen = ({ navigation, route }: any) => {
   const [search, setSearch] = useState('');
+  const [clients, setClients] = useState<any[]>([]);
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
-  const templateName = route.params?.templateName || 'Leg Day A - Strength Focus';
+  const [loading, setLoading] = useState(true);
+  const [assigning, setAssigning] = useState(false);
+  
+  const templateId = route.params?.templateId;
+  const templateName = route.params?.templateName || 'Template';
+
+  React.useEffect(() => {
+    fetchClients();
+  }, []);
+
+  const fetchClients = async () => {
+    try {
+      setLoading(true);
+      const response = await coachService.getCoachAthletes();
+      if (response.success) {
+        setClients(response.data);
+      }
+    } catch (error) {
+      console.error('Fetch clients error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAssign = async () => {
+    if (!templateId || selectedClients.length === 0) return;
+    
+    try {
+      setAssigning(true);
+      const startDate = new Date().toISOString(); // Simple start date, could add a picker
+      const response = await templateService.assignTemplate(templateId, selectedClients, startDate);
+      if (response.success) {
+        navigation.navigate('CoachTabs', { screen: 'CoachTemplates' });
+      }
+    } catch (error) {
+      console.error('Assign template error:', error);
+    } finally {
+      setAssigning(false);
+    }
+  };
 
   const toggleClient = (id: string) => {
     if (selectedClients.includes(id)) {
@@ -25,11 +59,17 @@ export const AssignPlanScreen = ({ navigation, route }: any) => {
   };
 
   const selectAll = () => {
-    if (selectedClients.length === clientsData.length) {
+    if (selectedClients.length === clients.length) {
       setSelectedClients([]);
     } else {
-      setSelectedClients(clientsData.map(c => c.id));
+      setSelectedClients(clients.map(c => c._id));
     }
+  };
+
+  const filteredClients = clients.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
+
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
   return (
@@ -74,7 +114,7 @@ export const AssignPlanScreen = ({ navigation, route }: any) => {
           {/* Select All Button */}
           <TouchableOpacity style={styles.selectAllBtn} onPress={selectAll}>
             <Text style={styles.selectAllText}>
-              {selectedClients.length === clientsData.length ? 'Deselect All' : 'Select All'}
+              {selectedClients.length === clients.length ? 'Deselect All' : 'Select All'}
             </Text>
           </TouchableOpacity>
 
@@ -83,38 +123,53 @@ export const AssignPlanScreen = ({ navigation, route }: any) => {
             <Text style={styles.listHeaderText}>SELECT CLIENTS ({selectedClients.length} SELECTED)</Text>
           </View>
 
-          {clientsData.map((client) => {
-            const isSelected = selectedClients.includes(client.id);
-            return (
-              <TouchableOpacity 
-                key={client.id} 
-                style={[styles.clientItem, isSelected && styles.clientItemActive]}
-                onPress={() => toggleClient(client.id)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.selectionIcon}>
-                  {isSelected ? (
-                    <CheckCircle2 size={24} color="#0F172A" fill="#0F172A" />
-                  ) : (
-                    <Circle size={24} color="#E2E8F0" />
-                  )}
-                </View>
-
-                <View style={[styles.avatar, { backgroundColor: client.color }]}>
-                  <Text style={styles.avatarText}>{client.avatar}</Text>
-                </View>
-
-                <View style={styles.clientInfo}>
-                  <Text style={styles.clientName}>{client.name}</Text>
-                  <View style={styles.clientSubRow}>
-                    <Text style={styles.clientStatus}>{client.status}</Text>
-                    <Text style={styles.dot}>•</Text>
-                    <Text style={styles.clientJoined}>Joined {client.joined}</Text>
+          {loading ? (
+            <Text style={styles.loadingText}>Loading clients...</Text>
+          ) : filteredClients.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <AlertCircle size={40} color="#CBD5E1" />
+              <Text style={styles.emptyTextTitle}>No clients found</Text>
+            </View>
+          ) : (
+            filteredClients.map((client) => {
+              const isSelected = selectedClients.includes(client._id);
+              return (
+                <TouchableOpacity 
+                  key={client._id} 
+                  style={[styles.clientItem, isSelected && styles.clientItemActive]}
+                  onPress={() => toggleClient(client._id)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.selectionIcon}>
+                    {isSelected ? (
+                      <CheckCircle2 size={24} color="#0F172A" fill="#0F172A" />
+                    ) : (
+                      <Circle size={24} color="#E2E8F0" />
+                    )}
                   </View>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+
+                  {client.profilePhoto ? (
+                    <Image source={{ uri: client.profilePhoto }} style={styles.avatar} />
+                  ) : (
+                    <View style={[styles.avatar, { backgroundColor: '#3B82F6' }]}>
+                      <Text style={styles.avatarText}>{getInitials(client.name)}</Text>
+                    </View>
+                  )}
+
+                  <View style={styles.clientInfo}>
+                    <Text style={styles.clientName}>{client.name}</Text>
+                    <View style={styles.clientSubRow}>
+                      <Text style={[styles.clientStatus, { color: client.status === 'active' ? '#10B981' : '#64748B' }]}>
+                        {client.status}
+                      </Text>
+                      <Text style={styles.dot}>•</Text>
+                      <Text style={styles.clientJoined}>Joined {new Date(client.createdAt).toLocaleDateString()}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          )}
 
         </ScrollView>
 
@@ -124,13 +179,13 @@ export const AssignPlanScreen = ({ navigation, route }: any) => {
             <Text style={styles.cancelBtnText}>Cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            style={[styles.assignBtn, selectedClients.length === 0 && styles.assignBtnDisabled]} 
-            onPress={() => navigation.goBack()}
-            disabled={selectedClients.length === 0}
+            style={[styles.assignBtn, (selectedClients.length === 0 || assigning) && styles.assignBtnDisabled]} 
+            onPress={handleAssign}
+            disabled={selectedClients.length === 0 || assigning}
           >
             <CheckCircle2 size={18} color={Colors.white} style={{marginRight: 8}} />
             <Text style={styles.assignBtnText}>
-              Assign to {selectedClients.length} Client{selectedClients.length !== 1 ? 's' : ''}
+              {assigning ? 'Assigning...' : `Assign to ${selectedClients.length} Client${selectedClients.length !== 1 ? 's' : ''}`}
             </Text>
           </TouchableOpacity>
         </View>
@@ -344,4 +399,18 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Colors.white,
   },
+  loadingText: {
+    textAlign: 'center',
+    marginTop: 20,
+    color: '#64748B',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    marginTop: 40,
+  },
+  emptyTextTitle: {
+    fontSize: 14,
+    color: '#64748B',
+    marginTop: 12,
+  }
 });

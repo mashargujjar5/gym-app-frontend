@@ -1,11 +1,44 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, TextInput, Platform, Switch } from 'react-native';
+import { ChevronLeft, Sparkles, ChevronDown, Check } from 'lucide-react-native';
+import { templateService } from '../services/templateService';
 import { Colors } from '../theme';
-import { ChevronLeft, Sparkles, ChevronDown } from 'lucide-react-native';
 
 export const AIWorkoutGeneratorScreen = ({ navigation }: any) => {
   const [workoutName, setWorkoutName] = useState('');
   const [includePrehab, setIncludePrehab] = useState(true);
+  const [focusArea, setFocusArea] = useState('Full Body');
+  const [duration, setDuration] = useState('60 min');
+  const [difficulty, setDifficulty] = useState('Intermediate');
+  const [loading, setLoading] = useState(false);
+
+  const handleGenerate = async () => {
+    if (!workoutName) return;
+
+    try {
+      setLoading(true);
+      const params = {
+        style: 'Bodybuilding', // Dynamic based on style card
+        focusArea,
+        duration: parseInt(duration),
+        difficulty
+      };
+
+      const response = await templateService.generateAITemplate(params);
+      if (response.success) {
+        // Pre-fill the name if provided
+        const aiData = {
+          ...response.data,
+          name: workoutName
+        };
+        navigation.navigate('CreateTemplate', { aiData });
+      }
+    } catch (error) {
+      console.error('Generate AI workout error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -66,26 +99,47 @@ export const AIWorkoutGeneratorScreen = ({ navigation }: any) => {
 
         <View style={styles.formGroup}>
           <Text style={styles.label}>FOCUS AREA *</Text>
-          <TouchableOpacity style={styles.dropdown}>
-            <Text style={styles.dropdownTextPlaceholder}>Select focus area</Text>
-            <ChevronDown size={20} color="#94A3B8" />
-          </TouchableOpacity>
+          <View style={styles.chipRow}>
+            {['Full Body', 'Upper Body', 'Lower Body', 'Push', 'Pull'].map(area => (
+              <TouchableOpacity 
+                key={area} 
+                style={[styles.chip, focusArea === area && styles.chipActive]}
+                onPress={() => setFocusArea(area)}
+              >
+                <Text style={[styles.chipText, focusArea === area && styles.chipTextActive]}>{area}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         <View style={styles.formGroup}>
           <Text style={styles.label}>WORKOUT DURATION</Text>
-          <TouchableOpacity style={styles.dropdown}>
-            <Text style={styles.dropdownTextValue}>60 min</Text>
-            <ChevronDown size={20} color="#94A3B8" />
-          </TouchableOpacity>
+          <View style={styles.chipRow}>
+            {['30 min', '45 min', '60 min', '75 min', '90 min'].map(time => (
+              <TouchableOpacity 
+                key={time} 
+                style={[styles.chip, duration === time && styles.chipActive]}
+                onPress={() => setDuration(time)}
+              >
+                <Text style={[styles.chipText, duration === time && styles.chipTextActive]}>{time}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         <View style={styles.formGroup}>
           <Text style={styles.label}>DIFFICULTY LEVEL</Text>
-          <TouchableOpacity style={styles.dropdown}>
-            <Text style={styles.dropdownTextValue}>Intermediate</Text>
-            <ChevronDown size={20} color="#94A3B8" />
-          </TouchableOpacity>
+          <View style={styles.chipRow}>
+            {['Beginner', 'Intermediate', 'Advanced'].map(level => (
+              <TouchableOpacity 
+                key={level} 
+                style={[styles.chip, difficulty === level && styles.chipActive]}
+                onPress={() => setDifficulty(level)}
+              >
+                <Text style={[styles.chipText, difficulty === level && styles.chipTextActive]}>{level}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         {/* Pre-hab Toggle */}
@@ -111,9 +165,15 @@ export const AIWorkoutGeneratorScreen = ({ navigation }: any) => {
 
       {/* Footer */}
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.generateBtn} onPress={() => navigation.navigate('CreateTemplate')}>
-          <Sparkles size={20} color="#94A3B8" style={{marginRight: 8}} />
-          <Text style={styles.generateBtnText}>Generate Workout</Text>
+        <TouchableOpacity 
+          style={[styles.generateBtn, (workoutName && !loading) && styles.generateBtnActive]} 
+          onPress={handleGenerate}
+          disabled={!workoutName || loading}
+        >
+          <Sparkles size={20} color={workoutName ? Colors.white : "#94A3B8"} style={{marginRight: 8}} />
+          <Text style={[styles.generateBtnText, workoutName && styles.generateBtnTextActive]}>
+            {loading ? 'Generating...' : 'Generate Workout'}
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -298,9 +358,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  generateBtnActive: {
+    backgroundColor: '#0F172A',
+  },
   generateBtnText: {
     fontSize: 16,
     fontWeight: '800',
     color: '#94A3B8',
+  },
+  generateBtnTextActive: {
+    color: Colors.white,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  chipActive: {
+    backgroundColor: '#06B6D4',
+    borderColor: '#06B6D4',
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  chipTextActive: {
+    color: Colors.white,
   }
 });

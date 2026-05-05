@@ -1,16 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Image, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Colors } from '../theme';
-import { ChevronLeft, MoreVertical, Plus, Send } from 'lucide-react-native';
+import { ChevronLeft, MoreVertical, Plus, Send, Check, CheckCheck } from 'lucide-react-native';
 import { messageService } from '../services/messageService';
+import { useAuth } from '../context/AuthContext';
+const SERVER_URL = 'http://localhost:5000'; // Replace with your actual server URL
+
 
 export const AthleteChatDetailScreen = ({ navigation, route }: any) => {
+  const { user } = useAuth();
   const { userId, name, avatar } = route.params;
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  const pollingRef = useRef<any>(null);
+
 
   const fetchMessages = async () => {
     try {
@@ -27,8 +33,15 @@ export const AthleteChatDetailScreen = ({ navigation, route }: any) => {
 
   useEffect(() => {
     fetchMessages();
-    // In a real app, you might set up a socket listener here
+    
+    // Simple polling for new messages every 5 seconds
+    pollingRef.current = setInterval(fetchMessages, 5000);
+    
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
   }, [userId]);
+
 
   const handleSend = async () => {
     if (!inputText.trim() || sending) return;
@@ -88,14 +101,24 @@ export const AthleteChatDetailScreen = ({ navigation, route }: any) => {
           onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
         >
           {messages.map((msg) => {
-            const isMe = msg.sender === userId ? false : true; // This is a bit simplified, usually you compare with logged in user ID
+            // Robust isMe check: convert both IDs to strings for reliable comparison
+            const msgSenderId = typeof msg.sender === 'object' ? msg.sender._id : msg.sender;
+            const currentUserId = user?.id || user?._id;
+            const isMe = !!(msgSenderId && currentUserId && String(msgSenderId) === String(currentUserId));
+            
+            const isDeleted = msg.deletedForEveryone;
+            const isRead = !!msg.readAt;
             
             return (
               <View key={msg._id} style={[styles.messageRow, isMe ? styles.messageRowMe : styles.messageRowThem]}>
+                {/* Avatar for Them (Left side) */}
                 {!isMe && (
                   <View style={styles.msgAvatarWrap}>
                     {avatar ? (
-                      <Image source={{ uri: avatar }} style={styles.msgAvatar} />
+                      <Image 
+                        source={{ uri: avatar.startsWith('http') ? avatar : `${SERVER_URL}/${avatar}` }} 
+                        style={styles.msgAvatar} 
+                      />
                     ) : (
                       <View style={styles.smallAvatarPlaceholder}>
                         <Text style={styles.smallAvatarText}>{name.charAt(0)}</Text>
@@ -103,17 +126,58 @@ export const AthleteChatDetailScreen = ({ navigation, route }: any) => {
                     )}
                   </View>
                 )}
-                <View style={[styles.msgContentContainer, isMe ? styles.msgContentContainerMe : styles.msgContentContainerThem]}>
-                  <View style={[styles.msgBubble, isMe ? styles.msgBubbleMe : styles.msgBubbleThem]}>
-                    <Text style={[styles.msgText, isMe ? styles.msgTextMe : styles.msgTextThem]}>{msg.content}</Text>
+
+                {/* Avatar for Me (Right side) */}
+                {isMe && (
+                  <View style={[styles.msgAvatarWrap, { marginLeft: 8, marginRight: 0 }]}>
+                    {user?.profilePhoto ? (
+                      <Image 
+                        source={{ uri: user.profilePhoto.startsWith('http') ? user.profilePhoto : `${SERVER_URL}/${user.profilePhoto}` }} 
+                        style={styles.msgAvatar} 
+                      />
+                    ) : (
+                      <View style={[styles.smallAvatarPlaceholder, { backgroundColor: Colors.primary }]}>
+                        <Text style={styles.smallAvatarText}>{user?.name?.charAt(0) || 'M'}</Text>
+                      </View>
+                    )}
                   </View>
-                  <Text style={[styles.msgTime, isMe ? styles.msgTimeMe : styles.msgTimeThem]}>
-                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </Text>
+                )}
+
+                <View style={[styles.msgContentContainer, isMe ? styles.msgContentContainerMe : styles.msgContentContainerThem]}>
+                  <View style={[
+                    styles.msgBubble, 
+                    isMe ? styles.msgBubbleMe : styles.msgBubbleThem,
+                    isDeleted && styles.msgBubbleDeleted
+                  ]}>
+                    <Text style={[
+                      styles.msgText, 
+                      isMe ? styles.msgTextMe : styles.msgTextThem,
+                      isDeleted && styles.msgTextDeleted
+                    ]}>
+                      {isDeleted ? 'This message was deleted' : msg.content}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.msgFooterRow}>
+                    <Text style={[styles.msgTime, isMe ? styles.msgTimeMe : styles.msgTimeThem]}>
+                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                    
+                    {isMe && !isDeleted && (
+                      <View style={styles.statusIndicator}>
+                        {isRead ? (
+                          <CheckCheck size={14} color="#38BDF8" /> // Blue for read
+                        ) : (
+                          <Check size={14} color="#94A3B8" /> // Grey for sent
+                        )}
+                      </View>
+                    )}
+                  </View>
                 </View>
               </View>
             );
           })}
+
         </ScrollView>
       )}
 
@@ -153,7 +217,7 @@ export const AthleteChatDetailScreen = ({ navigation, route }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.white,
+    backgroundColor: '#EFEFEF', // Light grey for chat background
   },
   header: {
     flexDirection: 'row',
@@ -266,13 +330,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
   },
   msgBubbleThem: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
     borderBottomLeftRadius: 4,
   },
   msgBubbleMe: {
-    backgroundColor: '#010E1F',
+    backgroundColor: '#DCF8C6', // WhatsApp Light Green
     borderBottomRightRadius: 4,
   },
   msgText: {
@@ -280,12 +349,23 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   msgTextThem: {
-    color: '#334155',
+    color: '#0F172A',
   },
   msgTextMe: {
-    color: Colors.white,
+    color: '#0F172A',
+  },
+  msgBubbleDeleted: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  msgTextDeleted: {
+    color: '#94A3B8',
+    fontStyle: 'italic',
+    fontSize: 12,
   },
   msgTime: {
+
     fontSize: 10,
     color: '#94A3B8',
     marginTop: 4,
@@ -294,6 +374,14 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   msgTimeThem: {
+    marginLeft: 4,
+  },
+  msgFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  statusIndicator: {
     marginLeft: 4,
   },
   inputContainer: {

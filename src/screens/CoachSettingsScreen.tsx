@@ -10,10 +10,12 @@ import {
   SafeAreaView,
   Platform,
   Share,
+  Clipboard,
+  Alert as RNAlert,
 } from 'react-native';
 import { Colors, BorderRadius } from '../theme';
 import { 
-  User, 
+  User as UserIcon, 
   Lock, 
   ShieldCheck, 
   LogOut, 
@@ -27,14 +29,48 @@ import {
   UserPlus,
   CheckCircle2,
 } from 'lucide-react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { coachService } from '../services/coachService';
+import { useAuth } from '../context/AuthContext';
+
 
 export const CoachSettingsScreen = ({ navigation }: any) => {
+  const { logout } = useAuth();
   const [isLbs, setIsLbs] = useState(true);
+
+  const [profile, setProfile] = useState<any>(null);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadProfile();
+    }, [])
+  );
+
+  const loadProfile = async () => {
+    try {
+      const res = await coachService.getProfile();
+      if (res.success) {
+        setProfile(res.data);
+      }
+    } catch (error) {
+      console.error('Failed to load profile in settings:', error);
+    }
+  };
+
+  const copyToClipboard = () => {
+    if (profile?.referralCode) {
+      Clipboard.setString(profile.referralCode);
+      RNAlert.alert('Copied!', 'Coach code has been copied to clipboard.');
+    } else {
+      Clipboard.setString('COACH-7X9K2');
+      RNAlert.alert('Copied!', 'Sample code copied.');
+    }
+  };
 
   const onShare = async () => {
     try {
       await Share.share({
-        message: 'Join my coaching on CoachMate! Use code: COACH-7X9K2',
+        message: `Join my coaching on CoachMate! Use code: ${profile?.referralCode || 'COACH-7X9K2'}`,
       });
     } catch (error) {
       console.log(error);
@@ -81,7 +117,7 @@ export const CoachSettingsScreen = ({ navigation }: any) => {
             <View style={styles.profileHeader}>
               <View style={styles.avatarContainer}>
                 <Image 
-                  source={{ uri: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=100&auto=format&fit=crop' }} 
+                  source={(profile?.profilePhoto && profile.profilePhoto !== '') ? { uri: profile.profilePhoto } : { uri: 'https://cdn-icons-png.flaticon.com/512/149/149071.png' }} 
                   style={styles.avatar} 
                 />
                 <View style={styles.certifiedBadge}>
@@ -90,13 +126,15 @@ export const CoachSettingsScreen = ({ navigation }: any) => {
                 </View>
               </View>
               <View style={styles.profileInfo}>
-                <Text style={styles.profileName}>Sarah Martinez</Text>
+                <Text style={styles.profileName}>{profile?.name || 'Loading...'}</Text>
                 <View style={styles.infoRow}>
-                  <Text style={styles.infoText}>✉️ sarah.martinez@email.com</Text>
+                  <Text style={styles.infoText}>✉️ {profile?.email || '...'}</Text>
                 </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoText}>📞 +1 (555) 123-4567</Text>
-                </View>
+                {profile?.phoneNumber && (
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoText}>📞 {profile.phoneNumber}</Text>
+                  </View>
+                )}
               </View>
             </View>
 
@@ -129,11 +167,11 @@ export const CoachSettingsScreen = ({ navigation }: any) => {
             </View>
             
             <View style={styles.codeValueContainer}>
-              <Text style={styles.coachCodeText}>COACH-7X9K2</Text>
+              <Text style={styles.coachCodeText}>{profile?.referralCode || 'COACH-7X9K2'}</Text>
             </View>
 
             <View style={styles.codeActions}>
-              <TouchableOpacity style={styles.codeActionBtn}>
+              <TouchableOpacity style={styles.codeActionBtn} onPress={copyToClipboard}>
                 <Copy size={18} color={Colors.textPrimary} />
                 <Text style={styles.codeActionText}>Copy</Text>
               </TouchableOpacity>
@@ -165,7 +203,7 @@ export const CoachSettingsScreen = ({ navigation }: any) => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>ACCOUNT</Text>
             <MenuItem 
-              icon={User} 
+              icon={UserIcon} 
               label="Edit Profile" 
               sublabel="Update your personal information" 
               onPress={() => navigation.navigate('EditProfile')}
@@ -223,8 +261,9 @@ export const CoachSettingsScreen = ({ navigation }: any) => {
           {/* Log Out */}
           <TouchableOpacity 
             style={styles.logoutBtn}
-            onPress={() => navigation.replace('Login')}
+            onPress={() => logout()}
           >
+
             <LogOut size={20} color="#EF4444" />
             <Text style={styles.logoutText}>Log Out</Text>
           </TouchableOpacity>

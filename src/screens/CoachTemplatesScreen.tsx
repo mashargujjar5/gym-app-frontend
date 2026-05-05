@@ -1,46 +1,54 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, TextInput, Platform } from 'react-native';
-import { Colors, BorderRadius } from '../theme';
-import { Search, Plus, Sparkles, Dumbbell, Link, Users, Lock, Unlock, Zap, Activity } from 'lucide-react-native';
-
-const mockTemplates = [
-  {
-    id: '1',
-    title: 'Leg Day A - Strength Focus',
-    tags: ['Lower Body', 'Advanced', 'Powerlifting'],
-    modified: '2 days ago',
-    exercises: 8,
-    duration: '60',
-    usedBy: 12,
-    isLocked: false,
-  },
-  {
-    id: '2',
-    title: 'Upper Body Push',
-    tags: ['Upper Body', 'Intermediate', 'Bodybuilding'],
-    modified: '1 week ago',
-    exercises: 5,
-    duration: '45',
-    usedBy: 15,
-    isLocked: true,
-  },
-  {
-    id: '3',
-    title: 'Full Body Hypertrophy',
-    tags: ['Full Body', 'Beginner', 'Hypertrophy'],
-    modified: '3 days ago',
-    exercises: 10,
-    duration: '75',
-    usedBy: 8,
-    isLocked: false,
-  }
-];
+import { Colors } from '../theme';
+import { Search, Plus, Sparkles, Dumbbell, Link, Users, Lock, Unlock, Zap, Activity, Trash2 } from 'lucide-react-native';
+import { templateService } from '../services/templateService';
+import { useFocusEffect } from '@react-navigation/native';
 
 const categories = ['All', 'Full Body', 'Upper Body', 'Lower Body'];
 
 export const CoachTemplatesScreen = ({ navigation }: any) => {
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchTemplates();
+    }, [activeCategory])
+  );
+
+  const fetchTemplates = async () => {
+    try {
+      setLoading(true);
+      const response = await templateService.getTemplates();
+      if (response.success) {
+        setTemplates(response.data);
+      }
+    } catch (error) {
+      console.error('Fetch templates error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteTemplate = async (id: string) => {
+    try {
+      const response = await templateService.deleteTemplate(id);
+      if (response.success) {
+        fetchTemplates();
+      }
+    } catch (error) {
+      console.error('Delete template error:', error);
+    }
+  };
+
+  const filteredTemplates = templates.filter(t => {
+    const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = activeCategory === 'All' || t.category === activeCategory;
+    return matchesSearch && matchesCategory;
+  });
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -51,7 +59,7 @@ export const CoachTemplatesScreen = ({ navigation }: any) => {
           <View style={styles.titleRow}>
             <Text style={styles.title}>Templates</Text>
             <View style={styles.badge}>
-              <Text style={styles.badgeText}>6 Total</Text>
+              <Text style={styles.badgeText}>{templates.length} Total</Text>
             </View>
           </View>
           
@@ -97,7 +105,7 @@ export const CoachTemplatesScreen = ({ navigation }: any) => {
 
           {/* Categories */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll} contentContainerStyle={styles.categoryContent}>
-            {categories.map(cat => (
+            {categories.map((cat: string) => (
               <TouchableOpacity
                 key={cat}
                 style={[styles.categoryPill, activeCategory === cat && styles.categoryPillActive]}
@@ -113,69 +121,76 @@ export const CoachTemplatesScreen = ({ navigation }: any) => {
 
         {/* Templates List */}
         <ScrollView style={styles.list} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-          {mockTemplates.map((template) => (
-            <View key={template.id} style={styles.card}>
-              <View style={styles.cardHeader}>
-                <View style={{flex: 1}}>
-                  <Text style={styles.cardTitle}>{template.title}</Text>
-                  <View style={styles.cardSubtitleRow}>
-                    <Text style={styles.cardSubtitleMain}>{template.tags[0]}</Text>
-                    <Text style={styles.cardSubtitleDot}>•</Text>
-                    <Text style={styles.cardSubtitleGray}>Modified {template.modified}</Text>
+          {loading ? (
+            <Text style={styles.loadingText}>Loading templates...</Text>
+          ) : filteredTemplates.length === 0 ? (
+            <View style={styles.emptyStateContainer}>
+              <Dumbbell size={48} color="#CBD5E1" />
+              <Text style={styles.emptyStateTitle}>No templates found</Text>
+              <Text style={styles.emptyStateSub}>Create your first workout template to get started</Text>
+            </View>
+          ) : (
+            filteredTemplates.map((template) => (
+              <View key={template._id} style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <View style={{flex: 1}}>
+                    <Text style={styles.cardTitle}>{template.name}</Text>
+                    <View style={styles.cardSubtitleRow}>
+                      <Text style={styles.cardSubtitleMain}>{template.category}</Text>
+                      <Text style={styles.cardSubtitleDot}>•</Text>
+                      <Text style={styles.cardSubtitleGray}>Modified {new Date(template.updatedAt).toLocaleDateString()}</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity style={styles.iconBtn} onPress={() => deleteTemplate(template._id)}>
+                    <Trash2 size={16} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.statsRow}>
+                  <View style={styles.statItem}>
+                    <Dumbbell size={14} color="#3B82F6" />
+                    <View style={styles.statTextCol}>
+                      <Text style={styles.statLabel}>Exercises</Text>
+                      <Text style={styles.statVal}>{template.exercises?.length || 0}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Activity size={14} color="#10B981" />
+                    <View style={styles.statTextCol}>
+                      <Text style={styles.statLabel}>Duration</Text>
+                      <Text style={styles.statVal}>{template.duration}m</Text>
+                    </View>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Users size={14} color="#64748B" />
+                    <View style={styles.statTextCol}>
+                      <Text style={styles.statLabel}>Used by</Text>
+                      <Text style={styles.statVal}>{template.usageCount || 0}</Text>
+                    </View>
                   </View>
                 </View>
-                <TouchableOpacity style={styles.iconBtn}>
-                  {template.isLocked ? <Lock size={16} color="#EF4444" /> : <Unlock size={16} color="#10B981" />}
+
+                <View style={styles.tagsRow}>
+                  <View style={[styles.tag, {backgroundColor: '#E0E7FF'}]}>
+                    <Text style={[styles.tagText, {color: '#4F46E5'}]}>{template.difficulty}</Text>
+                  </View>
+                  {template.tags && template.tags.map((tag: string, idx: number) => (
+                    <View key={idx} style={[styles.tag, {backgroundColor: '#F1F5F9'}]}>
+                      <Text style={[styles.tagText, {color: '#64748B'}]}>{tag}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                <TouchableOpacity 
+                  style={styles.assignBtn}
+                  onPress={() => navigation.navigate('AssignPlan', { templateId: template._id, templateName: template.name })}
+                >
+                  <Link size={16} color={Colors.white} />
+                  <Text style={styles.assignBtnText}>Assign to Clients</Text>
                 </TouchableOpacity>
               </View>
-
-              <View style={styles.statsRow}>
-                <View style={styles.statItem}>
-                  <Dumbbell size={14} color="#3B82F6" />
-                  <View style={styles.statTextCol}>
-                    <Text style={styles.statLabel}>Exercises</Text>
-                    <Text style={styles.statVal}>{template.exercises}</Text>
-                  </View>
-                </View>
-                <View style={styles.statItem}>
-                  <Activity size={14} color="#10B981" />
-                  <View style={styles.statTextCol}>
-                    <Text style={styles.statLabel}>Duration</Text>
-                    <Text style={styles.statVal}>{template.duration}</Text>
-                  </View>
-                </View>
-                <View style={styles.statItem}>
-                  <Users size={14} color="#64748B" />
-                  <View style={styles.statTextCol}>
-                    <Text style={styles.statLabel}>Used by</Text>
-                    <Text style={styles.statVal}>{template.usedBy}</Text>
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.tagsRow}>
-                <View style={[styles.tag, {backgroundColor: '#FEE2E2'}]}>
-                  <Text style={[styles.tagText, {color: '#EF4444'}]}>{template.tags[1]}</Text>
-                </View>
-                <View style={[styles.tag, {backgroundColor: '#FEF3C7'}]}>
-                  <Text style={[styles.tagText, {color: '#D97706'}]}>{template.tags[2]}</Text>
-                </View>
-                {template.tags[3] && (
-                  <View style={[styles.tag, {backgroundColor: '#E0E7FF'}]}>
-                    <Text style={[styles.tagText, {color: '#4F46E5'}]}>{template.tags[3]}</Text>
-                  </View>
-                )}
-              </View>
-
-              <TouchableOpacity 
-                style={styles.assignBtn}
-                onPress={() => navigation.navigate('AssignPlan', { templateName: template.title })}
-              >
-                <Link size={16} color={Colors.white} />
-                <Text style={styles.assignBtnText}>Assign to Clients</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
+            ))
+          )}
         </ScrollView>
 
         {/* FAB */}
@@ -472,5 +487,30 @@ const styles = StyleSheet.create({
       },
       android: { elevation: 8 }
     })
+  },
+  loadingText: {
+    textAlign: 'center',
+    marginTop: 40,
+    fontSize: 16,
+    color: '#64748B',
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 60,
+    paddingHorizontal: 40,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptyStateSub: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
   }
 });

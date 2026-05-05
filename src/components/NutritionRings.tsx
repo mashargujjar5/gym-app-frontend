@@ -65,9 +65,7 @@ export const NutritionRings: React.FC<NutritionRingsProps> = ({
                 strokeDasharray={circumference}
                 strokeDashoffset={strokeDashoffset}
                 strokeLinecap="round"
-                rotation="-90"
-                originX={center}
-                originY={center}
+                transform={`rotate(-90 ${center} ${center})`}
               />
             </React.Fragment>
           );

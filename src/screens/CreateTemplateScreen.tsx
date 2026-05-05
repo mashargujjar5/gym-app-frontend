@@ -2,34 +2,86 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, TextInput, ScrollView, Modal, Platform, KeyboardAvoidingView } from 'react-native';
 import { Colors } from '../theme';
 import { ChevronLeft, Plus, Search, X, Trash2, GripVertical } from 'lucide-react-native';
+import { templateService } from '../services/templateService';
 
-const MOCK_EXERCISES = [
-  { id: '1', name: 'Barbell Back Squat', tags: ['Legs', 'Compound'] },
-  { id: '2', name: 'Romanian Deadlift', tags: ['Legs', 'Compound'] },
-  { id: '3', name: 'Leg Press', tags: ['Legs', 'Machine'] },
-  { id: '4', name: 'Walking Lunges', tags: ['Legs', 'Bodyweight'] },
-  { id: '5', name: 'Leg Extension', tags: ['Legs', 'Machine'] },
-  { id: '6', name: 'Leg Curl', tags: ['Legs', 'Machine'] },
-  { id: '7', name: 'Bulgarian Split Squat', tags: ['Legs', 'Bodyweight'] },
-  { id: '8', name: 'Calf Raises', tags: ['Legs', 'Isolation'] },
-];
-
-export const CreateTemplateScreen = ({ navigation }: any) => {
-  const [workoutName, setWorkoutName] = useState('');
-  const [exercises, setExercises] = useState<any[]>([]);
+export const CreateTemplateScreen = ({ navigation, route }: any) => {
+  const [workoutName, setWorkoutName] = useState(route.params?.aiData?.name || '');
+  const [exercises, setExercises] = useState<any[]>(route.params?.aiData?.exercises?.map((ex: any) => ({
+    ...ex,
+    key: Math.random().toString(),
+    id: ex.exerciseId,
+    name: ex.exerciseName
+  })) || []);
+  const [exerciseLibrary, setExerciseLibrary] = useState<any[]>([]);
   const [isModalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    fetchExercises();
+  }, []);
+
+  const fetchExercises = async () => {
+    try {
+      const response = await templateService.getExercises();
+      if (response.success) {
+        setExerciseLibrary(response.data);
+      }
+    } catch (error) {
+      console.error('Fetch exercises error:', error);
+    }
+  };
 
   const addExercise = (exercise: any) => {
-    setExercises([...exercises, { ...exercise, key: Date.now().toString(), sets: '3', reps: '10', rest: '90', rpe: '7' }]);
-    // Optionally close modal after picking or let user pick multiple. Let's let them pick multiple.
+    setExercises([...exercises, { 
+      id: exercise._id,
+      name: exercise.name, 
+      tags: [exercise.muscleGroup, exercise.exerciseType],
+      key: Date.now().toString(), 
+      sets: '3', 
+      reps: '10', 
+      rest: '90', 
+      rpe: '7' 
+    }]);
   };
 
   const removeExercise = (key: string) => {
     setExercises(exercises.filter(ex => ex.key !== key));
   };
 
-  const filteredExercises = MOCK_EXERCISES.filter(ex => ex.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const updateExercise = (key: string, field: string, value: string) => {
+    setExercises(exercises.map(ex => ex.key === key ? { ...ex, [field]: value } : ex));
+  };
+
+  const saveTemplate = async () => {
+    try {
+      setLoading(true);
+      const templateData = {
+        name: workoutName.trim() || `Template ${new Date().toLocaleDateString()}`,
+        category: exercises[0]?.tags[0] || 'Full Body',
+        difficulty: 'Intermediate', // Can be made dynamic
+        duration: 60, // Can be calculated or made dynamic
+        exercises: exercises.map(ex => ({
+          exerciseId: ex.id,
+          sets: parseInt(ex.sets),
+          reps: ex.reps,
+          rest: ex.rest,
+          rpe: parseInt(ex.rpe)
+        }))
+      };
+
+      const response = await templateService.createTemplate(templateData);
+      if (response.success) {
+        navigation.navigate('CoachTabs', { screen: 'CoachTemplates' });
+      }
+    } catch (error) {
+      console.error('Save template error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredExercises = exerciseLibrary.filter(ex => ex.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -94,19 +146,39 @@ export const CreateTemplateScreen = ({ navigation }: any) => {
                   <View style={styles.exInputsRow}>
                     <View style={styles.exInputBox}>
                       <Text style={styles.exInputLabel}>SETS</Text>
-                      <TextInput style={styles.exInputVal} value={ex.sets} keyboardType="numeric" />
+                      <TextInput 
+                        style={styles.exInputVal} 
+                        value={ex.sets} 
+                        keyboardType="numeric"
+                        onChangeText={(val) => updateExercise(ex.key, 'sets', val)}
+                      />
                     </View>
                     <View style={styles.exInputBox}>
                       <Text style={styles.exInputLabel}>REPS</Text>
-                      <TextInput style={styles.exInputVal} value={ex.reps} keyboardType="numeric" />
+                      <TextInput 
+                        style={styles.exInputVal} 
+                        value={ex.reps} 
+                        keyboardType="default"
+                        onChangeText={(val) => updateExercise(ex.key, 'reps', val)}
+                      />
                     </View>
                     <View style={styles.exInputBox}>
                       <Text style={styles.exInputLabel}>REST (s)</Text>
-                      <TextInput style={styles.exInputVal} value={ex.rest} keyboardType="numeric" />
+                      <TextInput 
+                        style={styles.exInputVal} 
+                        value={ex.rest} 
+                        keyboardType="numeric"
+                        onChangeText={(val) => updateExercise(ex.key, 'rest', val)}
+                      />
                     </View>
                     <View style={styles.exInputBox}>
                       <Text style={styles.exInputLabel}>RPE</Text>
-                      <TextInput style={styles.exInputVal} value={ex.rpe} keyboardType="numeric" />
+                      <TextInput 
+                        style={styles.exInputVal} 
+                        value={ex.rpe} 
+                        keyboardType="numeric"
+                        onChangeText={(val) => updateExercise(ex.key, 'rpe', val)}
+                      />
                     </View>
                   </View>
                 </View>
@@ -127,10 +199,13 @@ export const CreateTemplateScreen = ({ navigation }: any) => {
             <Text style={styles.cancelBtnText}>Cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            style={[styles.saveBtn, (!workoutName || exercises.length === 0) && styles.saveBtnDisabled]}
-            disabled={!workoutName || exercises.length === 0}
+            style={[styles.saveBtn, (exercises.length === 0 || loading) && styles.saveBtnDisabled]}
+            disabled={exercises.length === 0 || loading}
+            onPress={saveTemplate}
           >
-            <Text style={[styles.saveBtnText, (!workoutName || exercises.length === 0) && styles.saveBtnTextDisabled]}>Save Template</Text>
+            <Text style={[styles.saveBtnText, (exercises.length === 0 || loading) && styles.saveBtnTextDisabled]}>
+              {loading ? 'Saving...' : 'Save Template'}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -167,8 +242,8 @@ export const CreateTemplateScreen = ({ navigation }: any) => {
                     <View style={styles.modalListItemText}>
                       <Text style={styles.modalListTitle}>{ex.name}</Text>
                       <View style={styles.modalListTags}>
-                        <Text style={[styles.modalTag, {color: '#06B6D4'}]}>{ex.tags[0]}</Text>
-                        <Text style={styles.modalTag}>{ex.tags[1]}</Text>
+                        <Text style={[styles.modalTag, {color: '#06B6D4'}]}>{ex.muscleGroup}</Text>
+                        <Text style={styles.modalTag}>{ex.exerciseType}</Text>
                       </View>
                     </View>
                     <TouchableOpacity style={styles.modalAddBtn} onPress={() => addExercise(ex)}>

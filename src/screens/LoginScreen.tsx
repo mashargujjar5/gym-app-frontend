@@ -13,10 +13,14 @@ import { Colors, Typography, BorderRadius } from '../theme';
 import { Button, Input } from '../components';
 import { LogIn, Mail, Lock, Apple } from 'lucide-react-native';
 import { authService } from '../services/authService';
+import { useAuth } from '../context/AuthContext';
 import { Alert } from 'react-native';
 
+
 export const LoginScreen = ({ navigation, route }: any) => {
+  const { login } = useAuth();
   const role = route?.params?.role || 'athlete';
+
   const isCoach = role === 'coach';
 
   const [email, setEmail] = useState('');
@@ -34,17 +38,19 @@ export const LoginScreen = ({ navigation, route }: any) => {
     try {
       const response = await authService.login({ email, password });
       if (response.success) {
-        // Redirection logic based on role and profile completion
+        await login(response.user, response.token, response.refreshToken);
+        
+        // Redirection is now handled by AppNavigator based on user state
+        // but if we need specific onboarding screens, we handle them here or in AppNavigator
         if (response.user.role === 'coach') {
-          navigation.replace('CoachTabs');
+          // If profile not setup, it will be handled by navigation or by user state
         } else {
-          if (response.user.isProfileComplete) {
-            navigation.replace('AthleteTabs');
-          } else {
+          if (!response.user.isProfileComplete) {
             navigation.replace('AthleteQuestionnaire');
           }
         }
       }
+
     } catch (error: any) {
       if (error.isVerified === false) {
         Alert.alert('Verification Required', 'Please verify your email first.');
